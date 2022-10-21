@@ -1,0 +1,13 @@
+Makefile
+**/__pycache__
+doc/build/*
+*.eps
+*.pdf
+*~
+*.swp
+*.nfs
+*.svn
+*.asv
+Simulations/
+spice/tb_*
+spice/subckt_*
