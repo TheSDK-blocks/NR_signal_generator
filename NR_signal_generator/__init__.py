@@ -38,6 +38,8 @@ import numpy as np
 import scipy.signal as sig
 from scipy import interpolate as inter
 import matplotlib.pyplot as plt
+from plot_PSD import plot_PSD
+
 class NR_signal_generator(thesdk): #rtl,eldo,thesdk
     @property
     def _classfile(self):
@@ -82,7 +84,8 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
             self.IOS.Members['control_write']= IO() 
             self.fil="on"
             self.equalizer="on"
-            self.fil_len=100 
+
+            self.fil_len=0#100 
             self.norm="max"             # max = normalize I & Q separately, amp = normalize amplitude to one
                                         
 
@@ -174,7 +177,6 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
 
 
     def osr_based_on_Fc(self):
-        #pdb.set_trace()
         BW_vect_abs=np.abs(self.BW)
         BW_tot=np.sum(BW_vect_abs) # get total bandwidth (in Hz)
         Fs_estimate=np.ceil(BW_tot/2)
@@ -272,7 +274,6 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
         N_BW=BW.size
         cnstl=[]
         #t=np.arange(0,sign.size)/Fs # initialize time vector (for mixing)
-        #pdb.set_trace()
         if sign.shape[1]==2:
             s=sign[:,0]+1j*sign[:,1]
             t=t=np.arange(0,len(s))/self.s_struct["Fs"]
@@ -320,7 +321,6 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
         #NOFDMsym=cnstl[0][0].size
         BW=self.BW
         BWP=self.BWP
-        #pdb.set_trace()
         tot_osr=self.osr
         cnstl=self.cnstl
         N_BW=BW.size
@@ -399,7 +399,7 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
                     ind+=1
                 max_len.append(sum(sub_len))
             else:
-                ind+=1
+                qind+=1
            
         max_len=max(max_len)
         slength=max_len
@@ -421,6 +421,9 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
                 if self.fil=='on': 
                     s=np.pad(s,(0,(int(slength)-len(s))),constant_values=0) 
                     s=self.NRfilter(Fs=Fs,raw_vector=s,BW=BWi,osr=max(osr[osr_ind:int(osr_ind+len(BWP[i]))]))
+                if len(s)>len(smatrix):
+                    zeros_matrix=np.zeros((len(s)-len(smatrix),np.shape(smatrix)[1]))
+                    smatrix=np.vstack([smatrix,zeros_matrix])
                 smatrix[0:len(s),i]=self.normalize(x=s,opt="max",k=1)
                 #smatrix[0:len(s),i]=s
                 osr_ind=int(osr_ind+len(BWP[i]))
@@ -434,7 +437,6 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
         # mix carriers to proper frequency offset
         f_off=np.zeros(N_BW)
         t_vect=np.arange(0,slength+self.fil_len*max(osr))/Fs
-        #plt.figure()
         for i in range(0,N_BW):
             BWi=BW[i]
             
@@ -443,21 +445,6 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
                 #f_off[i]=
                 test=smatrix[:,i]*np.exp(1j*2*np.pi*f_off[i]*t_vect)
                 s_raw=s_raw+smatrix[:,i]*np.exp(1j*2*np.pi*(self.Fc_gen+f_off[i])*t_vect)
-
-                #fig=plot_PSD2(test,100,Fs)
-        #plt.grid()
-        #plt.title("Carriers separately")
-        #plt.show()
-        #plt.figure()
-        #fig=plot_PSD2(s_raw[:int(len(s_raw)/2)],100,Fs)
-        #plt.grid()
-        #plt.title("First frame")
-        #plt.show()
-        #plt.figure()
-        #fig=plot_PSD2(s_raw[int(len(s_raw)/2):],100,Fs)
-        #plt.grid()
-        #plt.title("Second frame")
-        #plt.show()
         if (self.norm == "max"):
             s=self.normalize(x=s_raw,opt="max",k=1) # normalize final signal to 1
         elif (self.norm == "amp"):
@@ -601,8 +588,10 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
         if BW<min_BW:
             raise Exception("Width of selected BWP is too small for selected mu")
             return None
-        NFFT = 2**np.ceil(np.log2(RB*12/0.85))    # FFT size
+        NFFT = 2**np.ceil(np.log2(RB*12/0.9))    # FFT size
+        #pdb.set_trace()
         NFFT=max(128,NFFT)
+        #NFFT=4096
         Tc=1/(15e3*2**mu*NFFT)
         Ts=1/(15e3*2048)
         k=Ts/Tc
@@ -687,16 +676,7 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
 
 
 
-    #def x(self,m):
-    #    if (m == 6) or (m == 5) or (m == 4) or (m == 2) or (m == 1):
-    #        return 1
-    #    elif (m == 0) or (m == 3):
-    #        return 0
-    #    else:
-    #        i=m-7
-    #        return (self.x(i + 4) + self.x(i)) % 2  
-
-    
+       
     def genDMRS(self,**kwargs):
         """ Method for generation Demodulation Reference Signal
 
@@ -830,7 +810,6 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
         unusedOFDM=np.transpose(np.where(RE==None))
         unusedOFDM=unusedOFDM[np.lexsort((unusedOFDM[:,0], unusedOFDM[:,1]))]
         Ncnstl=len(unusedOFDM)
-        #pdb.set_trace()
         if bits=="max":
             np.random.seed(self.seed)
         if qam_type=="16QAM":
@@ -878,7 +857,7 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
         elif qam_type=="256QAM":
             M=256
             if bits=="max":
-                bbits=np.random.randint(2,size=int(np.log2(M)*Ncnstl))
+                bits=np.random.randint(2,size=int(np.log2(M)*Ncnstl))
 
             if  len(bits)>np.log2(M)*Ncnstl:
                  raise Exception("Not enough OFDM symbols. Max "+str(int(np.log2(M)*Ncnstl))+" bits or "+str(Ncnstl)+ " constellation points")
@@ -1235,6 +1214,10 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
         elif opt=="totpow":
             """TBD if needed"""
         return y
+    def find_filt(self,**kwargs):
+        pass
+
+
 
     def NRfilter(self,**kwargs):
         """ Method for filtering signal.
@@ -1267,9 +1250,9 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
         else:
             osr=1
         # select filter parameters
-        fac=1
+        #fac=1
         #fac=BW/150e6
-        order=self.fil_len*np.ceil(osr*fac) # filter order
+        #order=self.fil_len*np.ceil(osr*fac) # filter order
 
         dF=0
         for mu in range(0,5):
@@ -1284,23 +1267,62 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
         Fc=BW/2 # center of transition bandwidth
         t_vect=np.arange(0,len(raw_vector))/Fs
         # filter NR signal with circular convolution
+        #order=200
+        
+        ripple_dB=-1
+        att_dB=-80
+        #ripple=ripple_dB
+        #att=att_dB
+        ripple=10**(ripple_dB/20)
+        att=10**(att_dB/20)
         #pdb.set_trace()
-        b=sig.remez(int(order+1),[0,Fc-dF,Fc+dF,0.5*Fs],[1,0],Hz=int(Fs)) 
-        #plt.figure()
-        #plt.plot(b)
-        #plt.show()
-        #w, h = sig.freqz(b, [1], worN=2000)
-        #fig = plt.figure()
-        #ax = fig.add_subplot(111)
-        #ax.plot(0.5*Fs*w/np.pi, 20*np.log10(np.abs(h)))
-        #ax.set_xlim(0, 0.5*Fs)
-        #plt.show()
+        D=(0.005309*(np.log10(ripple))**2+0.07114*(np.log10(ripple))-0.4761)*(np.log10(att))-(0.00266*(np.log10(ripple))**2+0.5941*(np.log10(ripple))+0.4278)
+        f=11.012+0.51244*(np.log10(ripple)-np.log10(att))
+        ord_approx=(D-f*(dF/Fs)**2)/(dF/Fs)+1  #Herrmann
+        ord_approx2=(-20*np.log10(np.sqrt(ripple*att))-13)/(14.6*dF/Fs)+1
+
+        mid=(ord_approx+ord_approx2)/2
+        N_min=max(20,int(mid-100))
+        N_max=int(mid+100)
+        #print(ord_approx)
+        #print(ord_approx2)
+        sb_max_dB=-80
+        sb_max=10**(sb_max_dB/20)
+        #if int(ord_approx)%2!=0:
+        #    ord_approx+=1
+        #if int(ord_approx2)%2!=0:
+        #    ord_approx2+=1
+        test=N_min
+        sb_best=1
+        att_freq=Fc+dF
+        if att_freq>Fs/2:
+            att_freq=Fc
+            
+        for ord in range(N_min,N_max):
+            try:
+                b=sig.remez(int(ord+1),[0,Fc-dF,att_freq,0.5*Fs],[1,0],Hz=int(Fs)) 
+                #order=ord
+                #plt.figure()
+                #plt.plot(b)
+                #plt.show()
+                w, h = sig.freqz(b, [1], worN=2000,fs=Fs)
+                idx=np.argwhere(w>((att_freq)))[0][0]
+                sb=max(np.abs(h[idx:]))
+                if sb<sb_best:
+                    sb_best=sb
+                if sb<=sb_max:
+                    order=ord
+                    self.fil_len=ord
+                    break
+               
+            except:
+                pass
+       
         bb=b
         #bb=np.pad(b,(0,len(raw_vector)-len(b)),constant_values=0)
         #s_fil=np.fft.ifft(np.fft.fft(raw_vector,len(raw_vector))*np.fft.fft(bb,len(raw_vector)))
         s_fil=np.convolve(raw_vector.reshape((-1,1))[:,0],bb,mode='full').reshape((-1,1))
-
-        # compensate group delay (order/2)
+                # compensate group delay (order/2)
         s_out=np.concatenate((s_fil[int(order/2):],s_fil[0:int(order/2)]))
         #s_out=s_fil
         return s_out[:,0]
@@ -1375,7 +1397,6 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
             # and looking for its maximum
             pad=np.pad(PSSt, (0,len(sign)-len(PSSt)), constant_values=0)
             xcmax=np.argmax(np.absolute(np.correlate(sign,pad,"full"))) 
-            #pdb.set_trace()
             # calculate ideal result of the cross-correlation maximum (see above)
             if N_symb_TOT==0:
                 print("ERROR")
@@ -1601,10 +1622,10 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
         rxDataSymbols_nzero = rxDataSymbols_vect[np.argwhere(rxDataSymbols_vect)]
         refDataSymbols_nzero = refDataSymbols_vect[np.argwhere(refDataSymbols_vect)]
         # normalize constellation powers
-        #rxDataSymbols = self.normalize(rxDataSymbols_nzero, 'pow', 1);
-        #refDataSymbols = self.normalize(refDataSymbols_nzero, 'pow', 1);
-        rxDataSymbols = rxDataSymbols_nzero
-        refDataSymbols = refDataSymbols_nzero
+        rxDataSymbols = self.normalize(x=rxDataSymbols_nzero, opt='pow', k=1);
+        refDataSymbols = self.normalize(x=refDataSymbols_nzero, opt='pow', k=1);
+        #rxDataSymbols = rxDataSymbols_nzero
+        #refDataSymbols = refDataSymbols_nzero
 
         # calculate EVM using Matlab's built-in functions
         #Copied from https://github.com/TheSDK-blocks/f2_testbench/blob/master/f2_testbench/analyzers_mixin.py
@@ -1628,6 +1649,7 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
         #RMS for Scaling
         rmsref=np.std(reference)
         rmsreceived=np.std(received)
+        #pdb.set_trace()
         EVM=(np.mean(np.mean(np.abs(received-reference)**2,axis=0)/np.mean(np.abs(reference)**2,axis=0)))**(1/2)
 
         
@@ -1649,55 +1671,6 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
         # and after 'initdone' is set to 1 by controller
         self.iofile_bundle.Members['out'].verilog_io_condition_append(cond='&& initdone')
 
-def plot_PSD(x,a,*arg):
-    if len(arg)>=1:
-        Fs=int(arg[0])
-        s=x.s_struct["s"]
-        s=s[:,1]+1j*s[:,2]
-        BW=x.BW[0]
-    else:
-        Fs = int(x.s_struct["Fs"])
-        s=x.s_struct["s"]
-        s=s[:,1]+1j*s[:,2]
-        BW=x.BW
-    
-
-
-    #s=x.NRfilter(Fs,s,BW,x.osr)
-    Lsegm_perc = 10
-    Fs_given = 0
-    plot_color = 'k'
-    win_type = 'tukey'
-    param = 0.1
-    overlap_perc = 50
-
-    Fs_given = 1
-    
-    fmin = -Fs/2
-    fmax = Fs/2
-
-    Lsegm_perc = a
-    a=len(s)
-    Lsegm = round(len(s)*Lsegm_perc/100)
-    noverlap = round(Lsegm * overlap_perc/100)
-    win=sig.tukey(Lsegm,param)
-    f,Pxx=sig.welch(s,Fs,win,Lsegm,noverlap=noverlap,detrend=False)
-    
-    y=10*np.log10(Pxx/max(Pxx))
-
-
-    
-    L = len(f)
-    n1 = round((L-1)/Fs*fmin + (L+1)/2)
-    n2 = round((L-1)/Fs * fmax + (L+1)/2)
-    f_plot = f[n1-1:n2]
-    y_plot = y[n1-1:n2]
-    fig=plt.figure()
-    plt.plot(f_plot/(10**6),y_plot)
-    plt.grid()
-    plt.title("Signal spectrum")
-    plt.show(block=False)
-    return fig
 
 
 def plot_PSD2(x,a,*arg):
@@ -1780,7 +1753,7 @@ if __name__=="__main__":
     #BWP=np.array([[[4,7,0,1]],[[4,7,0,1]]])
     BWP=np.array([[[4,7,0,1]]])
     #BW=np.array([400e6,400e6])
-    BW=np.array([200e6])
+    BW=np.array([150e6])
     #mu=[0,0]
     #QAM="16QAM"
     QAM="64QAM"
