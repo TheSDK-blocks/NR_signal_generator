@@ -239,7 +239,7 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
             EVM_BWP=np.zeros(N_BWP)
             rxDataSymbols_BWP=[]
             for j in range(0,N_BWP):
-                if cnstl[i][j]!=[]:
+                if cnstl[i][j].size!=0:
                     EVM1,rxDataSymbols1=self.measEVMdownlink(BW=BW[i],BWP=BWP[i][j],cnstl=cnstl[i][j],dem=dem[i][j])
                     EVM_BWP[j]=EVM1
                     rxDataSymbols_BWP.append(rxDataSymbols1)
@@ -472,7 +472,6 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
             self.genMultiQAM()
 
         """
-        #pdb.set_trace()
         BW=self.BW
         BWP=self.BWP
         qam_type=self.QAM
@@ -589,7 +588,6 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
             raise Exception("Width of selected BWP is too small for selected mu")
             return None
         NFFT = 2**np.ceil(np.log2(RB*12/0.9))    # FFT size
-        #pdb.set_trace()
         NFFT=max(128,NFFT)
         #NFFT=4096
         Tc=1/(15e3*2**mu*NFFT)
@@ -1275,7 +1273,6 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
         #att=att_dB
         ripple=10**(ripple_dB/20)
         att=10**(att_dB/20)
-        #pdb.set_trace()
         D=(0.005309*(np.log10(ripple))**2+0.07114*(np.log10(ripple))-0.4761)*(np.log10(att))-(0.00266*(np.log10(ripple))**2+0.5941*(np.log10(ripple))+0.4278)
         f=11.012+0.51244*(np.log10(ripple)-np.log10(att))
         ord_approx=(D-f*(dF/Fs)**2)/(dF/Fs)+1  #Herrmann
@@ -1580,7 +1577,7 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
 
         Nsc,N_symb=cnstl.shape # get some info from constellation matrix dimensions
         mu=BWP[0]
-        if dem==[]:
+        if dem.size==0:
             return 0,0
         Nsc_rx, N_symb_rx = dem.shape
         if Nsc!=Nsc_rx or   N_symb!=N_symb_rx:
@@ -1649,7 +1646,6 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
         #RMS for Scaling
         rmsref=np.std(reference)
         rmsreceived=np.std(received)
-        #pdb.set_trace()
         EVM=(np.mean(np.mean(np.abs(received-reference)**2,axis=0)/np.mean(np.abs(reference)**2,axis=0)))**(1/2)
 
         
@@ -1788,7 +1784,6 @@ if __name__=="__main__":
         #test.include_time_vector=1
         test.in_bits=in_bits
         test.run_gen()
-        #pdb.set_trace()
         rand=np.random.rand(1000,2)/10000
          
         test.IOS.Members['in_dem'].Data=np.vstack([rand,test.IOS.Members['out'].Data])
