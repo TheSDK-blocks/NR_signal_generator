@@ -239,7 +239,7 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
             EVM_BWP=np.zeros(N_BWP)
             rxDataSymbols_BWP=[]
             for j in range(0,N_BWP):
-                if cnstl[i][j]!=[]:
+                if not cnstl[i][j].size==0:
                     EVM1,rxDataSymbols1=self.measEVMdownlink(BW=BW[i],BWP=BWP[i][j],cnstl=cnstl[i][j],dem=dem[i][j])
                     EVM_BWP[j]=EVM1
                     rxDataSymbols_BWP.append(rxDataSymbols1)
@@ -431,12 +431,13 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
                 cnstlmatrix.append([])
                 osr_ind=int(osr_ind+len(BWP[i]))
  
-        s_raw=np.zeros(int(slength+self.fil_len*max(osr)),complex)
+        s_raw=np.zeros(int(slength+self.fil_len),complex)
         BWtot=np.sum(BW_vect_abs) # get total bandwidth (in Hz)
 
         # mix carriers to proper frequency offset
         f_off=np.zeros(N_BW)
-        t_vect=np.arange(0,slength+self.fil_len*max(osr))/Fs
+        #t_vect=np.arange(0,slength+self.fil_len*max(osr))/Fs
+        t_vect=np.arange(0,slength+self.fil_len)/Fs
         for i in range(0,N_BW):
             BWi=BW[i]
             
@@ -1286,7 +1287,7 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
         N_max=int(mid+100)
         #print(ord_approx)
         #print(ord_approx2)
-        sb_max_dB=-80
+        sb_max_dB=-60
         sb_max=10**(sb_max_dB/20)
         #if int(ord_approx)%2!=0:
         #    ord_approx+=1
@@ -1304,7 +1305,7 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
                 #order=ord
                 #plt.figure()
                 #plt.plot(b)
-                #plt.show()
+                #plt.show(block=False)
                 w, h = sig.freqz(b, [1], worN=2000,fs=Fs)
                 idx=np.argwhere(w>((att_freq)))[0][0]
                 sb=max(np.abs(h[idx:]))
@@ -1580,7 +1581,7 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
 
         Nsc,N_symb=cnstl.shape # get some info from constellation matrix dimensions
         mu=BWP[0]
-        if dem==[]:
+        if dem.size==0:
             return 0,0
         Nsc_rx, N_symb_rx = dem.shape
         if Nsc!=Nsc_rx or   N_symb!=N_symb_rx:
