@@ -1288,7 +1288,6 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
         #print(ord_approx)
         #print(ord_approx2)
         sb_max_dB=-80
-        sb_max=10**(sb_max_dB/20)
         #if int(ord_approx)%2!=0:
         #    ord_approx+=1
         #if int(ord_approx2)%2!=0:
@@ -1299,25 +1298,34 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
         if att_freq>Fs/2:
             att_freq=Fc
             
-        for ord in range(N_min,N_max):
-            try:
-                b=sig.remez(int(ord+1),[0,Fc-dF,att_freq,0.5*Fs],[1,0],Hz=int(Fs)) 
-                #order=ord
-                #plt.figure()
-                #plt.plot(b)
-                #plt.show(block=False)
-                w, h = sig.freqz(b, [1], worN=2000,fs=Fs)
-                idx=np.argwhere(w>((att_freq)))[0][0]
-                sb=max(np.abs(h[idx:]))
-                if sb<sb_best:
-                    sb_best=sb
-                if sb<=sb_max:
-                    order=ord
-                    self.fil_len=ord
-                    break
-               
-            except:
-                pass
+        sb_max_dB_list=[i for i in range(0,abs(sb_max_dB-10),10)]
+        sb_max_dB_list.reverse()
+        sb_max_list=[10**(-sb_max_dB_list[i]/20) for i in range(len(sb_max_dB_list))]
+        done=False
+        for sb_max in sb_max_list:
+            for ord in range(N_min,N_max):
+                try:
+                    b=sig.remez(int(ord+1),[0,Fc-dF,att_freq,0.5*Fs],[1,0],Hz=int(Fs)) 
+                    #order=ord
+                    #plt.figure()
+                    #plt.plot(b)
+                    #plt.show(block=False)
+                    w, h = sig.freqz(b, [1], worN=2000,fs=Fs)
+                    idx=np.argwhere(w>((att_freq)))[0][0]
+                    sb=max(np.abs(h[idx:]))
+                    if sb<sb_best:
+                        sb_best=sb
+                    if sb<=sb_max:
+                        order=ord
+                        self.fil_len=ord
+                        break
+                   
+                except:
+                    pass
+            else:
+                continue
+            break
+        pdb.set_trace()
        
         bb=b
         #bb=np.pad(b,(0,len(raw_vector)-len(b)),constant_values=0)
