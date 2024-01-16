@@ -1325,7 +1325,6 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
             else:
                 continue
             break
-        pdb.set_trace()
        
         bb=b
         #bb=np.pad(b,(0,len(raw_vector)-len(b)),constant_values=0)
