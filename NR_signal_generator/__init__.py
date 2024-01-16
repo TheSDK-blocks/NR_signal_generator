@@ -1287,7 +1287,7 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
         N_max=int(mid+100)
         #print(ord_approx)
         #print(ord_approx2)
-        sb_max_dB=-60
+        sb_max_dB=-80
         sb_max=10**(sb_max_dB/20)
         #if int(ord_approx)%2!=0:
         #    ord_approx+=1
