@@ -1298,7 +1298,7 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
         if att_freq>Fs/2:
             att_freq=Fc
             
-        sb_max_dB_list=[i for i in range(0,abs(sb_max_dB-10),10)]
+        sb_max_dB_list=[i for i in range(0,abs(sb_max_dB-10),20)]
         sb_max_dB_list.reverse()
         sb_max_list=[10**(-sb_max_dB_list[i]/20) for i in range(len(sb_max_dB_list))]
         done=False
