@@ -399,7 +399,7 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
                     ind+=1
                 max_len.append(sum(sub_len))
             else:
-                qind+=1
+                ind+=1
            
         max_len=max(max_len)
         slength=max_len
