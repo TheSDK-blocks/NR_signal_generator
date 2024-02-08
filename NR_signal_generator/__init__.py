@@ -1646,7 +1646,7 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
         #RMS for Scaling
         rmsref=np.std(reference)
         rmsreceived=np.std(received)
-        EVM=(np.mean(np.mean(np.abs(received-reference)**2,axis=0)/np.mean(np.abs(reference)**2,axis=0)))**(1/2)
+        EVM=(np.mean(np.mean(np.abs(received/rmsreceived*rmsref-reference)**2,axis=0)/np.mean(np.abs(reference)**2,axis=0)))**(1/2)
 
         
         return EVM, rxDataSymbols
