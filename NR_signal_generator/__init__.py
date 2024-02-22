@@ -146,11 +146,13 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
         #del self.iofile_bundle
 
 
-    def main_dem(self):
+    def main_dem(self,**kwargs):
+        car_return=kwargs.get('car_return',False)
+        sig_offset=kwargs.get('sig_offset',0)
         self.rec_sig=self.IOS.Members['in_dem'].Data # Input signal as matrix descibed in main_gen()      
         if not hasattr(self.BW,"__len__") :
             self.BW=[self.BW]
-        self.dem=self.demMultiNRdownlink()
+        self.dem=self.demMultiNRdownlink(car_return=car_return, sig_offset=sig_offset)
         self.dem_bits, self.dem_cnstl_vec=self.MultiQAMtoBit()
         #self.IOS.Members['W'].Data=self.dem_bits # Outputdata as binary list 
         #self.IOS.Members['V'].Data=self.dem # Demodulated resource grid with PSS and CRS   
@@ -163,13 +165,15 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
     def main_EVM(self):
         self.EVM, self.rxDataSymbols=self.measMultiEVMdownlink()
 
-    def run_dem(self,*arg):
+    def run_dem(self,*arg,**kwargs):
+        car_return=kwargs.get('car_return',False) #return the carriers back to their original spots
+        sig_offset=kwargs.get('sig_offset',0)
         if len(arg)<0:
             self.rap=TRue
             self.queue=arg[0]
         
         if self.model=='py':
-            self.main_dem()
+            self.main_dem(car_return=car_return, sig_offset=sig_offset)
 
         #del self.iofile_bundle
 
@@ -254,7 +258,7 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
 
 
 
-    def demMultiNRdownlink(self):
+    def demMultiNRdownlink(self,**kwargs):
         """ Method for demodulate constellation points from recieved signal for multiple carriers.
 
 
@@ -264,6 +268,9 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
             self.demMultiNRdownlink()
 
         """
+        #return the carriers back to their original spots. Use this to find which carrier is at DC
+        car_return=kwargs.get('car_return',False)
+        sig_offset=kwargs.get('sig_offset',0)
 
         sign=self.rec_sig
         BW=self.BW
@@ -285,7 +292,11 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
             BWi=BW[i]
             if BWi>0:
                 # mix current carrier so that it is centered at 0 Hz
-                v_mixed=s*np.exp(-1j*2*np.pi*(self.Fc_gen+f_off[i])*t)
+                if(car_return == False):
+                    v_mixed=s*np.exp(-1j*2*np.pi*(self.Fc_gen+f_off[i])*t)
+                else:
+                    carrier_offset = self.Fc_gen + f_off[i] + sig_offset
+                    v_mixed=s*np.exp(-1j*2*np.pi*carrier_offset*t)
                 osr=[]
                 # calculate OSR of current carrier
                 for j in range(0,len(BWP[i])):
@@ -297,6 +308,10 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
                 if self.fil=='on': 
                     v_filt=self.NRfilter(Fs=Fs,raw_vector=v_mixed,BW=BWi,osr=max(osr))
 
+                if(car_return == True):
+                    t2=np.arange(0,len(v_filt))/self.s_struct["Fs"] #NRfilter changes the array size
+                    v_filt=v_filt*np.exp(+1j*2*np.pi*carrier_offset*t2)
+                
                 a=self.demNRdownlink(s=v_filt,BW=BWi,BWP=BWP[i],osr=osr)
                 cnstl.append(a)
             else:
