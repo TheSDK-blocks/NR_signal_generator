@@ -48,7 +48,7 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
     def __init__(self,*arg): # ,BW,osr,Nsymb,qam_type,bits
 
             self.print_log(type='I', msg='Inititalizing %s' %(__name__)) 
-            self.proplist = [ 'BW','BWP','osr','QAM','in_bits','include_time_vector','Fc_gen' ];    # Properties that can be propagated from parent
+            self.proplist = [ 'signal_id','BW','BWP','osr','QAM','in_bits','include_time_vector','Fc_gen' ];    # Properties that can be propagated from parent
 
             self.IOS=Bundle()
             #self.IOS.Members['A']=IO() # Pointer for input data
@@ -89,6 +89,7 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
             self.norm="max"             # max = normalize I & Q separately, amp = normalize amplitude to one
                                         
 
+            self.signal_id = 0 #used for generating different seeds for different signals
 
             if len(arg)>=1:
                 parent=arg[0]
@@ -149,31 +150,35 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
     def main_dem(self,**kwargs):
         car_return=kwargs.get('car_return',False)
         sig_offset=kwargs.get('sig_offset',0)
+        NR_car_id=kwargs.get('NR_car_id',-1)
         self.rec_sig=self.IOS.Members['in_dem'].Data # Input signal as matrix descibed in main_gen()      
         if not hasattr(self.BW,"__len__") :
             self.BW=[self.BW]
-        self.dem=self.demMultiNRdownlink(car_return=car_return, sig_offset=sig_offset)
-        self.dem_bits, self.dem_cnstl_vec=self.MultiQAMtoBit()
+        self.dem=self.demMultiNRdownlink(car_return=car_return, sig_offset=sig_offset, NR_car_id=NR_car_id)
+        self.dem_bits, self.dem_cnstl_vec=self.MultiQAMtoBit(NR_car_id=NR_car_id)
         #self.IOS.Members['W'].Data=self.dem_bits # Outputdata as binary list 
         #self.IOS.Members['V'].Data=self.dem # Demodulated resource grid with PSS and CRS   
         #self.IOS.Members['U'].Data=self.dem_cnstl_vec # Demodulated contellation points 
    
-    def run_EVM(self):
+    def run_EVM(self,**kwargs):
+        NR_car_id=kwargs.get('NR_car_id',-1)
         if self.model=='py':
-            self.main_EVM()
+            self.main_EVM(NR_car_id=NR_car_id)
 
-    def main_EVM(self):
-        self.EVM, self.rxDataSymbols=self.measMultiEVMdownlink()
+    def main_EVM(self,**kwargs):
+        NR_car_id=kwargs.get('NR_car_id',-1)
+        self.EVM, self.rxDataSymbols=self.measMultiEVMdownlink(NR_car_id=NR_car_id)
 
     def run_dem(self,*arg,**kwargs):
         car_return=kwargs.get('car_return',False) #return the carriers back to their original spots
         sig_offset=kwargs.get('sig_offset',0)
+        NR_car_id=kwargs.get('NR_car_id',-1)
         if len(arg)<0:
-            self.rap=TRue
+            self.rap=True
             self.queue=arg[0]
         
         if self.model=='py':
-            self.main_dem(car_return=car_return, sig_offset=sig_offset)
+            self.main_dem(car_return=car_return, sig_offset=sig_offset, NR_car_id=NR_car_id)
 
         #del self.iofile_bundle
 
@@ -194,7 +199,7 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
 
 
 
-    def MultiQAMtoBit(self):
+    def MultiQAMtoBit(self,**kwargs):
         """ Method for calculate binary data based on recieved constellation points for multiple carriers.
 
 
@@ -203,6 +208,7 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
             self.MultiQAMtoBit()
 
         """
+        NR_car_id=kwargs.get('NR_car_id',-1)
 
         qam_type=self.QAM
         dem=self.dem
@@ -211,13 +217,17 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
         bits=[]
         dem_cnstl_vec=[]
         for i in range(0,len(dem)):
-            temp1,temp2=self.QAMtoBit(cnstl=dem[i],BW=BW[i],BWP=BWP[i])
-            bits.append(temp1)
-            dem_cnstl_vec.append(temp2)
+            if(NR_car_id == -1 or i == NR_car_id):
+                temp1,temp2=self.QAMtoBit(cnstl=dem[i],BW=BW[i],BWP=BWP[i])
+                bits.append(temp1)
+                dem_cnstl_vec.append(temp2)
+            else:
+                bits.append(np.array([]))
+                dem_cnstl_vec.append(np.array([]))
 
         return bits, dem_cnstl_vec
 
-    def measMultiEVMdownlink(self):
+    def measMultiEVMdownlink(self,**kwargs):
         """ Method for calculating EVM based on generated constellation points and recieved constellation points for multiple carriers.
 
 
@@ -228,6 +238,8 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
 
         """
 
+        NR_car_id=kwargs.get('NR_car_id',-1)
+        
         BW=self.BW
         BWP=self.BWP
         dem=self.dem
@@ -239,19 +251,23 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
         rxDataSymbols=[]
         # measure EVM separately for each constellation
         for i in range(0,N_BW):
-            N_BWP=len(cnstl[i])
-            EVM_BWP=np.zeros(N_BWP)
-            rxDataSymbols_BWP=[]
-            for j in range(0,N_BWP):
-                if not cnstl[i][j].size==0:
-                    EVM1,rxDataSymbols1=self.measEVMdownlink(BW=BW[i],BWP=BWP[i][j],cnstl=cnstl[i][j],dem=dem[i][j])
-                    EVM_BWP[j]=EVM1
-                    rxDataSymbols_BWP.append(rxDataSymbols1)
+            if(NR_car_id==-1 or i==NR_car_id):
+                N_BWP=len(cnstl[i])
+                EVM_BWP=np.zeros(N_BWP)
+                rxDataSymbols_BWP=[]
+                for j in range(0,N_BWP):
+                    if not cnstl[i][j].size==0:
+                        EVM1,rxDataSymbols1=self.measEVMdownlink(BW=BW[i],BWP=BWP[i][j],cnstl=cnstl[i][j],dem=dem[i][j])
+                        EVM_BWP[j]=EVM1
+                        rxDataSymbols_BWP.append(rxDataSymbols1)
 
-                else:
-                    rxDataSymbols_BWP.append([])
-            rxDataSymbols.append(rxDataSymbols_BWP)
-            EVM.append(EVM_BWP)
+                    else:
+                        rxDataSymbols_BWP.append([])
+                rxDataSymbols.append(rxDataSymbols_BWP)
+                EVM.append(EVM_BWP)
+            else:
+                rxDataSymbols.append(np.array([]))
+                EVM.append(np.array([]))
         return EVM, rxDataSymbols
 
 
@@ -271,6 +287,7 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
         #return the carriers back to their original spots. Use this to find which carrier is at DC
         car_return=kwargs.get('car_return',False)
         sig_offset=kwargs.get('sig_offset',0)
+        NR_car_id=kwargs.get('NR_car_id',-1)
 
         sign=self.rec_sig
         BW=self.BW
@@ -290,7 +307,8 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
         # demodulate carriers
         for i in range(0,N_BW):
             BWi=BW[i]
-            if BWi>0:
+            if BWi>0 and (NR_car_id == -1 or i == NR_car_id):
+                
                 # mix current carrier so that it is centered at 0 Hz
                 if(car_return == False):
                     v_mixed=s*np.exp(-1j*2*np.pi*(self.Fc_gen+f_off[i])*t)
@@ -313,9 +331,20 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
                     v_filt=v_filt*np.exp(+1j*2*np.pi*carrier_offset*t2)
                 
                 a=self.demNRdownlink(s=v_filt,BW=BWi,BWP=BWP[i],osr=osr)
+                
+                '''
+                osr=[]
+                # calculate OSR of current carrier
+                for j in range(0,len(BWP[i])):
+                    dl_osrl=self.NRparameters(mu=BWP[i][j][0],BW=BW[i])
+                    osr.append(dl_osrl["Fs"])
+                osr=np.around(Fs/np.array(osr))
+                
+                a=self.demNRdownlink(s=s,BW=BWi,BWP=BWP[i],osr=osr)
+                '''
                 cnstl.append(a)
             else:
-                cnstl.append([])
+                cnstl.append(np.array([]))
         return cnstl
 
 
@@ -504,7 +533,7 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
                 sub_bits=[]
                 b=np.size(bits[i],0)
                 for j in range(0,b):
-                    a,bit=self.genQAM(bits=bits[i][j],BW=BW[i], BWP=BWP[i][j])
+                    a,bit=self.genQAM(carrier_id=i, bits=bits[i][j],BW=BW[i], BWP=BWP[i][j])
                     sub_cnstl.append(a)
                     sub_bits.append(bit)
                 cnstl.append(sub_cnstl)
@@ -791,6 +820,7 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
 
         """
 
+        carrier_id=kwargs.get('carrier_id')
         bits=kwargs.get('bits')
         BW=kwargs.get('BW')
         BWP=kwargs.get('BWP')
@@ -827,7 +857,8 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
         unusedOFDM=unusedOFDM[np.lexsort((unusedOFDM[:,0], unusedOFDM[:,1]))]
         Ncnstl=len(unusedOFDM)
         if bits=="max":
-            np.random.seed(self.seed)
+            #np.random.seed(self.seed)
+            np.random.seed((carrier_id + self.signal_id*13 + 1)*123)
         if qam_type=="16QAM":
             M=16
             if bits=="max":
@@ -1015,6 +1046,13 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
                 index = np.argmin(np.abs(np.array(points)-DataSymbols_nzero[j]))
                 bit_vect.extend(points_as_bits[index])
                 
+                
+                #if(j == int(1876/6-1) or j == int(1876/6) or j == int(1876/6+1)):
+                #    print(j, DataSymbols_nzero[j])
+                    
+                #if(j == int(5618/6-1) or j == int(5618/6) or j == int(5618/6+1)):
+                #    print(j, DataSymbols_nzero[j])
+                    
 
             cnstl_of_carrier.append(DataSymbols_nzero)
             vector.append(np.array(bit_vect))
@@ -1317,8 +1355,32 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
         sb_max_dB_list.reverse()
         sb_max_list=[10**(-sb_max_dB_list[i]/20) for i in range(len(sb_max_dB_list))]
         done=False
+        
+        
+        
+        
+        
+        
+        
+        #python doesn't allow you to change the for loop iterator mid-loop so let's make a 1D-loop
+        allindices = []
         for sb_max in sb_max_list:
             for ord in range(N_min,N_max):
+                allindices.append([sb_max, ord])
+        
+        skipcount = 32 #skip n iterations during the broad-phase
+        skipindex = 0
+        
+        for currentphase in range(2): #broad-phase first and then narrow-phase
+            for index in allindices:
+                sb_max, ord = index
+                
+                #broad phase iteration (when skipcount != 0)
+                if(skipindex > 0):
+                    skipindex -= 1
+                    continue
+                skipindex = skipcount
+                
                 try:
                     b=sig.remez(int(ord+1),[0,Fc-dF,att_freq,0.5*Fs],[1,0],Hz=int(Fs)) 
                     #order=ord
@@ -1334,12 +1396,24 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
                         order=ord
                         self.fil_len=ord
                         break
-                   
                 except:
                     pass
-            else:
-                continue
-            break
+                
+            #go back n iterations and try again with the narrow-phase
+            if(currentphase == 0):
+                endindex = allindices.index(index)
+                startindex = endindex - skipcount
+                if(startindex < 0):
+                    startindex = 0
+                allindices = allindices[startindex : endindex+1]
+                skipcount = 0
+                skipindex = 0
+        
+        
+        
+        
+        
+            
        
         bb=b
         #bb=np.pad(b,(0,len(raw_vector)-len(b)),constant_values=0)
@@ -1674,6 +1748,13 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
         rmsreceived=np.std(received)
         #pdb.set_trace()
         EVM=(np.mean(np.mean(np.abs(received-reference)**2,axis=0)/np.mean(np.abs(reference)**2,axis=0)))**(1/2)
+        
+        
+        
+        #always gets stuck on this for some reason
+        #fig=plt.figure()
+        #plt.plot(   ( np.abs(received-reference)**2 / np.mean(np.abs(reference)**2,axis=0) )**(1/2), drawstyle="steps-post")
+        #plt.show()
 
         
         return EVM, rxDataSymbols
