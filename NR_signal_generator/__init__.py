@@ -1370,7 +1370,7 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
         
         skipcount = 32 #skip n iterations during the broad-phase
         skipindex = 0
-        
+        b = None 
         for currentphase in range(2): #broad-phase first and then narrow-phase
             for index in allindices:
                 sb_max, ord = index
@@ -1382,7 +1382,7 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
                 skipindex = skipcount
                 
                 try:
-                    b=sig.remez(int(ord+1),[0,Fc-dF,att_freq,0.5*Fs],[1,0],Hz=int(Fs)) 
+                    b=sig.remez(int(ord+1),[0,Fc-dF,att_freq,0.5*Fs],[1,0],fs=int(Fs)) 
                     #order=ord
                     #plt.figure()
                     #plt.plot(b)
@@ -1396,7 +1396,8 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
                         order=ord
                         self.fil_len=ord
                         break
-                except:
+                except Exception as e :
+                    self.print_log(type="E", msg='Could not generate b: %s' % (e))
                     pass
                 
             #go back n iterations and try again with the narrow-phase
