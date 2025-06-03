@@ -1370,7 +1370,6 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
         
         skipcount = 32 #skip n iterations during the broad-phase
         skipindex = 0
-        b = None 
         for currentphase in range(2): #broad-phase first and then narrow-phase
             for index in allindices:
                 sb_max, ord = index
