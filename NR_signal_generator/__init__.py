@@ -1398,7 +1398,6 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
                 except Exception as e :
                     self.print_log(type="E", msg='Could not generate b: %s' % (e))
                     pass
-                
             #go back n iterations and try again with the narrow-phase
             if(currentphase == 0):
                 endindex = allindices.index(index)
