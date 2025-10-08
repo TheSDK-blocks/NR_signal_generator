@@ -929,7 +929,6 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
                 d=1/np.sqrt(42)*((1-2*bits[6*i])*(4-(1-2*bits[6*i+2])*(2-(1-2*bits[6*i+4])))+1j*(1-2*bits[6*i+1])*(4-(1-2*bits[6*i+3])*(2-(1-2*bits[6*i+5]))))  
                 qam=np.append(qam,d)
         
-        
         return qam,bits
 
 
@@ -1542,6 +1541,7 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
             if equalize=='off':
                 cnstl = RE;
                 cnstl_of_carrier.append(cnstl)
+                continue
             # re-create DMRS/PSS grid (i.e. post-FFT ideal reference signal)
             RE_id = np.ones((RE.shape),complex)
             start=int(np.floor(dl["RB"]*BWP[n][2])*12)
