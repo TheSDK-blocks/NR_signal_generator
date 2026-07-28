@@ -1609,7 +1609,7 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
 
             for i in np.arange(1,k.size+1):
                 m_avg_w_length = min(2*i-1, 2*(k.size-i)+1, 19)
-                m_avg_imp_resp = (np.ones((1, m_avg_w_length))) / m_avg_w_length
+                m_avg_imp_resp = np.ones(m_avg_w_length) / m_avg_w_length
                 test=np.dot(m_avg_imp_resp , a_avg[k[int(i-np.floor(m_avg_w_length/2)-1):int(i+np.floor(m_avg_w_length/2))]])
                 a_coeff[k[int(i-1)]] = np.dot(m_avg_imp_resp , a_avg[k[int(i-np.floor(m_avg_w_length/2)-1):int(i+np.floor(m_avg_w_length/2))]])
                 phi_coeff[k[int(i-1)]] = np.dot(m_avg_imp_resp , phi_avg[k[int(i-np.floor(m_avg_w_length/2)-1):int(i+np.floor(m_avg_w_length/2))]])
