@@ -33,7 +33,6 @@ from thesdk import *
 #from eldo import *
 #from eldo.testbench import *
 #from eldo.testbench import testbench as etb 
-import pdb
 import numpy as np
 import scipy.signal as sig
 from scipy import interpolate as inter
@@ -137,10 +136,6 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
 
 
     def run_gen(self,*arg):
-        if len(arg)<0:
-            self.rap=True
-            self.queue=arg[0]
-        
         if self.model=='py':
             self.main_gen()
 
@@ -173,10 +168,6 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
         car_return=kwargs.get('car_return',False) #return the carriers back to their original spots
         sig_offset=kwargs.get('sig_offset',0)
         NR_car_id=kwargs.get('NR_car_id',-1)
-        if len(arg)<0:
-            self.rap=True
-            self.queue=arg[0]
-        
         if self.model=='py':
             self.main_dem(car_return=car_return, sig_offset=sig_offset, NR_car_id=NR_car_id)
 
@@ -1267,11 +1258,6 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
         elif opt=="totpow":
             """TBD if needed"""
         return y
-    def find_filt(self,**kwargs):
-        pass
-
-
-
     def NRfilter(self,**kwargs):
         """ Method for filtering signal.
 
@@ -1762,84 +1748,6 @@ class NR_signal_generator(thesdk): #rtl,eldo,thesdk
 
 
 
-
-
-    def define_io_conditions(self):
-        
-        # Input A is read to verilog simulation after 'initdone' is set to 1 by controller
-        self.iofile_bundle.Members['A']._io_condition='initdone'
-        # Output is read to verilog simulation when all of the outputs are valid, 
-        # and after 'initdone' is set to 1 by controller
-        self.iofile_bundle.Members['out'].verilog_io_condition_append(cond='&& initdone')
-
-
-
-def plot_PSD2(x,a,*arg):
-    if len(arg)>=1:
-        Fs=int(arg[0])
-        s=x
-        
-    else:
-        Fs = int(x.s_struct["Fs"])
-        s=x
-        
-    
-
-    #s=x.NRfilter(s,BW,x.osr)
-    Lsegm_perc = 10
-    Fs_given = 0
-    plot_color = 'k'
-    win_type = 'tukey'
-    param = 0.1
-    overlap_perc = 50
-
-    Fs_given = 1
-    
-    fmin = -Fs/2
-    fmax = Fs/2
-
-    Lsegm_perc = a
-    a=len(s)
-    Lsegm = round(len(s)*Lsegm_perc/100)
-    noverlap = round(Lsegm * overlap_perc/100)
-    win=sig.tukey(Lsegm,param)
-    f,Pxx=sig.welch(s,Fs,win,Lsegm,noverlap=noverlap,detrend=False)
-    
-    y=10*np.log10(Pxx/max(Pxx))
-
-
-    
-    L = len(f)
-    n1 = round((L-1)/Fs*fmin + (L+1)/2)
-    n2 = round((L-1)/Fs * fmax + (L+1)/2)
-    f_plot = f[n1-1:n2]
-    y_plot = y[n1-1:n2]
-    #fig=plt.figure()
-    plt.plot(f_plot/(10**6),y_plot)
-    #plt.grid()
-    #plt.show()
-    #return fig
-
-
-
-def meas(x,Fs):
-    s=x.s_struct["s"]
-    s=s[:,1]+1j*s[:,2]
-    f,Pxx=sig.periodogram(s,Fs,return_onesided=False)
-
-    y=Pxx
-    fmin = -Fs/2
-    fmax = Fs/2
-    L = len(f)
-    n1 = int(round((L-1)/Fs*fmin + (L+1)/2))
-    n2 = int(round((L-1)/Fs * fmax + (L+1)/2))
-    f_plot = f[n1-1:n2]
-    y_plot = y[n1-1:n2]
-    plt.figure()
-    #plt.pcolormesh(t, f, Sxx)
-    plt.plot(f_plot/(10**6),y_plot)
-    plt.grid()
-    plt.show()
 
 
 if __name__=="__main__":
