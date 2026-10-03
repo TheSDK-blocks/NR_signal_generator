@@ -27,13 +27,8 @@ import numpy as np
 def modulate(bits, Ncnstl, qam_type, carrier_id, signal_id):
     """Generate constellation points with the original bit preparation."""
     qam = np.array([], complex)
-    if bits == "max":
-        # np.random.seed(self.seed)
-        np.random.seed((carrier_id + signal_id * 13 + 1) * 123)
     if qam_type == "16QAM":
         M = 16
-        if bits == "max":
-            bits = np.random.randint(2, size=int(np.log2(M) * Ncnstl))
 
         if len(bits) > np.log2(M) * Ncnstl:
             raise Exception(
@@ -63,8 +58,6 @@ def modulate(bits, Ncnstl, qam_type, carrier_id, signal_id):
 
     elif qam_type == "4QAM":
         M = 4
-        if bits == "max":
-            bits = np.random.randint(2, size=int(np.log2(M) * Ncnstl))
         if len(bits) > np.log2(M) * Ncnstl:
             raise Exception(
                 "Not enough OFDM symbols. Max "
@@ -90,8 +83,6 @@ def modulate(bits, Ncnstl, qam_type, carrier_id, signal_id):
 
     elif qam_type == "BPSK":
         M = 2
-        if bits == "max":
-            bits = np.random.randint(2, size=int(np.log2(M) * Ncnstl))
 
         if len(bits) > np.log2(M) * Ncnstl:
             raise Exception(
@@ -112,8 +103,6 @@ def modulate(bits, Ncnstl, qam_type, carrier_id, signal_id):
 
     elif qam_type == "256QAM":
         M = 256
-        if bits == "max":
-            bits = np.random.randint(2, size=int(np.log2(M) * Ncnstl))
 
         if len(bits) > np.log2(M) * Ncnstl:
             raise Exception(
@@ -160,8 +149,6 @@ def modulate(bits, Ncnstl, qam_type, carrier_id, signal_id):
 
     else:  # 64QAM
         M = 64
-        if bits == "max":
-            bits = np.random.randint(2, size=int(np.log2(M) * Ncnstl))
 
         if len(bits) > np.log2(M) * Ncnstl:
             raise Exception(

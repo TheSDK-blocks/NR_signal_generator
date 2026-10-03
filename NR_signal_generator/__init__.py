@@ -970,6 +970,13 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         unusedOFDM = np.transpose(np.where(RE == None))
         unusedOFDM = unusedOFDM[np.lexsort((unusedOFDM[:, 0], unusedOFDM[:, 1]))]
         Ncnstl = len(unusedOFDM)
+
+        if bits == "max":
+            seed = (carrier_id + signal_id * 13 + 1) * 123
+            rng = np.random.RandomState(seed)
+            bits = rng.randint(2, size=capacity)
+            # TODO: replace capacity with bits_per_symbol * Ncnstl
+
         return constellation.modulate(bits, Ncnstl, qam_type, carrier_id, self.signal_id)
 
     def QAMtoBit(self, **kwargs):
