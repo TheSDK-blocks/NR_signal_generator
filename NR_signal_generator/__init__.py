@@ -36,6 +36,11 @@ from scipy import interpolate as inter
 import matplotlib.pyplot as plt
 from plot_PSD import plot_PSD
 
+if __package__:
+    from .constellation import modulate, demodulate
+else:  # Support the existing direct __init__.py simulation entry point.
+    from constellation import modulate, demodulate
+
 
 class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
     @property
@@ -941,7 +946,6 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         BWP = kwargs.get("BWP")
 
         qam_type = self.QAM
-        qam = np.array([], complex)
         dl = self.NRparameters(mu=BWP[0], BW=BW)
         Nsymb = int(BWP[1])
         RE = np.full((dl["Nsc"], Nsymb), None)
@@ -969,178 +973,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         unusedOFDM = np.transpose(np.where(RE == None))
         unusedOFDM = unusedOFDM[np.lexsort((unusedOFDM[:, 0], unusedOFDM[:, 1]))]
         Ncnstl = len(unusedOFDM)
-        if bits == "max":
-            # np.random.seed(self.seed)
-            np.random.seed((carrier_id + self.signal_id * 13 + 1) * 123)
-        if qam_type == "16QAM":
-            M = 16
-            if bits == "max":
-                bits = np.random.randint(2, size=int(np.log2(M) * Ncnstl))
-
-            if len(bits) > np.log2(M) * Ncnstl:
-                raise Exception(
-                    "Not enough OFDM symbols. Max "
-                    + str(int(np.log2(M) * Ncnstl))
-                    + " bits or "
-                    + str(Ncnstl)
-                    + " constellation points"
-                )
-
-            if len(bits) != np.log2(M) * Ncnstl:
-                bits = np.pad(
-                    bits, (0, int(np.log2(M) * Ncnstl - len(bits))), constant_values=0
-                )
-            for i in range(0, int(len(bits) / np.log2(M))):
-                d = (
-                    1
-                    / np.sqrt(10)
-                    * (
-                        (1 - 2 * bits[4 * i]) * (2 - (1 - 2 * bits[4 * i + 2]))
-                        + 1j
-                        * (1 - 2 * bits[4 * i + 1])
-                        * (2 - (1 - 2 * bits[4 * i + 3]))
-                    )
-                )
-                qam = np.append(qam, d)
-
-        elif qam_type == "4QAM":
-            M = 4
-            if bits == "max":
-                bits = np.random.randint(2, size=int(np.log2(M) * Ncnstl))
-            if len(bits) > np.log2(M) * Ncnstl:
-                raise Exception(
-                    "Not enough OFDM symbols. Max "
-                    + str(int(np.log2(M) * Ncnstl))
-                    + " bits or "
-                    + str(Ncnstl)
-                    + " constellation points"
-                )
-            else:
-                if len(bits) != np.log2(M) * Ncnstl:
-                    bits = np.pad(
-                        bits,
-                        (0, int(np.log2(M) * Ncnstl - len(bits))),
-                        constant_values=0,
-                    )
-                for i in range(0, int(len(bits) / np.log2(M))):
-                    d = (
-                        1
-                        / np.sqrt(2)
-                        * ((1 - 2 * bits[2 * i]) + 1j * (1 - 2 * bits[2 * i + 1]))
-                    )
-                    qam = np.append(qam, d)
-
-        elif qam_type == "BPSK":
-            M = 2
-            if bits == "max":
-                bits = np.random.randint(2, size=int(np.log2(M) * Ncnstl))
-
-            if len(bits) > np.log2(M) * Ncnstl:
-                raise Exception(
-                    "Not enough OFDM symbols. Max "
-                    + str(int(np.log2(M) * Ncnstl))
-                    + " bits or "
-                    + str(Ncnstl)
-                    + " constellation points"
-                )
-
-            if len(bits) != np.log2(M) * Ncnstl:
-                bits = np.pad(
-                    bits, (0, int(np.log2(M) * Ncnstl - len(bits))), constant_values=0
-                )
-            for i in range(0, int(len(bits) / np.log2(M))):
-                d = 1 / np.sqrt(2) * ((1 - 2 * bits[i]) + 1j * (1 - 2 * bits[i]))
-                qam = np.append(qam, d)
-
-        elif qam_type == "256QAM":
-            M = 256
-            if bits == "max":
-                bits = np.random.randint(2, size=int(np.log2(M) * Ncnstl))
-
-            if len(bits) > np.log2(M) * Ncnstl:
-                raise Exception(
-                    "Not enough OFDM symbols. Max "
-                    + str(int(np.log2(M) * Ncnstl))
-                    + " bits or "
-                    + str(Ncnstl)
-                    + " constellation points"
-                )
-
-            if len(bits) != np.log2(M) * Ncnstl:
-                bits = np.pad(
-                    bits, (0, int(np.log2(M) * Ncnstl - len(bits))), constant_values=0
-                )
-            for i in range(0, int(len(bits) / np.log2(M))):
-                d = (
-                    1
-                    / np.sqrt(170)
-                    * (
-                        (1 - 2 * bits[8 * i])
-                        * (
-                            8
-                            - (1 - 2 * bits[8 * i + 2])
-                            * (
-                                4
-                                - (1 - 2 * bits[8 * i + 4])
-                                * (2 - (1 - 2 * bits[8 * i + 6]))
-                            )
-                        )
-                        + 1j
-                        * (1 - 2 * bits[8 * i + 1])
-                        * (
-                            8
-                            - (1 - 2 * bits[8 * i + 3])
-                            * (
-                                4
-                                - (1 - 2 * bits[8 * i + 5])
-                                * (2 - (1 - 2 * bits[8 * i + 7]))
-                            )
-                        )
-                    )
-                )
-                qam = np.append(qam, d)
-
-        else:  # 64QAM
-            M = 64
-            if bits == "max":
-                bits = np.random.randint(2, size=int(np.log2(M) * Ncnstl))
-
-            if len(bits) > np.log2(M) * Ncnstl:
-                raise Exception(
-                    "Not enough OFDM symbols. Max "
-                    + str(int(np.log2(M) * Ncnstl))
-                    + " bits or "
-                    + str(Ncnstl)
-                    + " constellation points"
-                )
-
-            if len(bits) != np.log2(M) * Ncnstl:
-                bits = np.pad(
-                    bits, (0, int(np.log2(M) * Ncnstl - len(bits))), constant_values=0
-                )
-            for i in range(0, int(len(bits) / np.log2(M))):
-                d = (
-                    1
-                    / np.sqrt(42)
-                    * (
-                        (1 - 2 * bits[6 * i])
-                        * (
-                            4
-                            - (1 - 2 * bits[6 * i + 2])
-                            * (2 - (1 - 2 * bits[6 * i + 4]))
-                        )
-                        + 1j
-                        * (1 - 2 * bits[6 * i + 1])
-                        * (
-                            4
-                            - (1 - 2 * bits[6 * i + 3])
-                            * (2 - (1 - 2 * bits[6 * i + 5]))
-                        )
-                    )
-                )
-                qam = np.append(qam, d)
-
-        return qam, bits
+        return modulate(bits, Ncnstl, qam_type, carrier_id, self.signal_id)
 
     def QAMtoBit(self, **kwargs):
         """Method for generating binary array based on constellation points.
@@ -1213,82 +1046,8 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
             # keep only non-zero symbols
 
             DataSymbols_nzero = DataSymbols_vect[np.argwhere(DataSymbols_vect)]
-            bit_vect = []
-            if qam_type == "16QAM":
-                M = 16
-                m = np.log2(M)
-            elif qam_type == "4QAM":
-                M = 4
-                m = np.log2(M)
-            elif qam_type == "BPSK":
-                M = 2
-                m = np.log2(M)
-            elif qam_type == "256QAM":
-                M = 256
-                m = np.log2(M)
-            else:  # 64QAM
-                M = 64
-                m = np.log2(M)
-            points = []
-            points_as_bits = []
-            for i in range(0, M):
-                bits = np.array(list(np.binary_repr(i, int(m))), dtype=int)
-                if qam_type == "16QAM":
-                    d = (
-                        1
-                        / np.sqrt(10)
-                        * (
-                            (1 - 2 * bits[0]) * (2 - (1 - 2 * bits[2]))
-                            + 1j * (1 - 2 * bits[1]) * (2 - (1 - 2 * bits[3]))
-                        )
-                    )
-                elif qam_type == "4QAM":
-                    d = 1 / np.sqrt(2) * ((1 - 2 * bits[0]) + 1j * (1 - 2 * bits[1]))
-
-                elif qam_type == "BPSK":
-                    d = 1 / np.sqrt(2) * ((1 - 2 * bits[0]) + 1j * (1 - 2 * bits[0]))
-
-                elif qam_type == "256QAM":
-                    d = (
-                        1
-                        / np.sqrt(170)
-                        * (
-                            (1 - 2 * bits[0])
-                            * (
-                                8
-                                - (1 - 2 * bits[2])
-                                * (4 - (1 - 2 * bits[4]) * (2 - (1 - 2 * bits[6])))
-                            )
-                            + 1j
-                            * (1 - 2 * bits[1])
-                            * (
-                                8
-                                - (1 - 2 * bits[3])
-                                * (4 - (1 - 2 * bits[5]) * (2 - (1 - 2 * bits[7])))
-                            )
-                        )
-                    )
-
-                else:  # 64QAM
-                    d = (
-                        1
-                        / np.sqrt(42)
-                        * (
-                            (1 - 2 * bits[0])
-                            * (4 - (1 - 2 * bits[2]) * (2 - (1 - 2 * bits[4])))
-                            + 1j
-                            * (1 - 2 * bits[1])
-                            * (4 - (1 - 2 * bits[3]) * (2 - (1 - 2 * bits[5])))
-                        )
-                    )
-                points.append(d)
-                points_as_bits.append(bits)
-            for j in range(0, len(DataSymbols_nzero)):
-                index = np.argmin(np.abs(np.array(points) - DataSymbols_nzero[j]))
-                bit_vect.extend(points_as_bits[index])
-
             cnstl_of_carrier.append(DataSymbols_nzero)
-            vector.append(np.array(bit_vect))
+            vector.append(demodulate(DataSymbols_nzero, qam_type))
         return vector, cnstl_of_carrier
 
     def genNRdownlink(self, **kwargs):
