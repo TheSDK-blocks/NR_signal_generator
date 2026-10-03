@@ -35,6 +35,7 @@ from thesdk import *
 # from eldo import *
 # from eldo.testbench import *
 # from eldo.testbench import testbench as etb
+import pdb
 import numpy as np
 import scipy.signal as sig
 from scipy import interpolate as inter
@@ -527,7 +528,6 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         self.genMultiQAM()
 
         """
-        # pdb.set_trace()
         BW = self.BW
         BWP = self.BWP
         qam_type = self.QAM
@@ -668,16 +668,13 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
             raise Exception("Width of selected BWP is too small for selected mu")
             return None
         NFFT = 2 ** np.ceil(np.log2(RB * 12 / 0.9))  # FFT size
-        # pdb.set_trace()
         NFFT = max(128, NFFT)
         # NFFT=4096
         Tc = 1 / (15e3 * 2**mu * NFFT)
         Ts = 1 / (15e3 * 2048)
         k = Ts / Tc
         Fs = NFFT * SCS  # sampling frequency
-        Ncp1 = (
-            144 * k * (1 / (2**mu)) + 16 * k
-        )  # length of cyclic prefix 0 and 7*2**mu
+        Ncp1 = 144 * k * (1 / (2**mu)) + 16 * k  # length of cyclic prefix 0 and 7*2**mu
         Ncp2 = 144 * k * (1 / (2**mu))  # length of cyclic prefixes else
         Nofdm1 = NFFT + Ncp1  # length of OFDM symbol 0
         Nofdm2 = NFFT + Ncp2  # length of OFDM symbols 1-6
@@ -1473,12 +1470,8 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
             w_ofdm1[
                 int(dl["NFFT"] - dl["Ncp1"] - Lr) : int(dl["NFFT"] - dl["Ncp1"])
             ] = w_rise  # window start
-            w_ofdm1[
-                int(2 * dl["NFFT"] - 1) : int(2 * dl["NFFT"] + Lr - 1)
-            ] = w_fade  # window end
-            w_ofdm1[
-                int(dl["NFFT"] - dl["Ncp1"]) : int(2 * dl["NFFT"] - 1)
-            ] = 1  # window center
+            w_ofdm1[int(2 * dl["NFFT"] - 1) : int(2 * dl["NFFT"] + Lr - 1)] = w_fade  # window end
+            w_ofdm1[int(dl["NFFT"] - dl["Ncp1"]) : int(2 * dl["NFFT"] - 1)] = 1  # window center
             # create Tukey window for OFDM symbols 2 to 7 of each slot
             w_ofdm2to7 = np.zeros(int(3 * dl["NFFT"]), complex)
             w_ofdm2to7[
@@ -1587,6 +1580,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
             """TBD if needed"""
         return y
 
+
     def NRfilter(self, **kwargs):
         """Method for filtering signal.
 
@@ -1643,7 +1637,6 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         # att=att_dB
         ripple = 10 ** (ripple_dB / 20)
         att = 10 ** (att_dB / 20)
-        # pdb.set_trace()
         D = (
             0.005309 * (np.log10(ripple)) ** 2 + 0.07114 * (np.log10(ripple)) - 0.4761
         ) * (np.log10(att)) - (
@@ -2136,7 +2129,6 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         # RMS for Scaling
         rmsref = np.std(reference)
         rmsreceived = np.std(received)
-        # pdb.set_trace()
         EVM = (
             np.mean(
                 np.mean(np.abs(received - reference) ** 2, axis=0)
@@ -2199,7 +2191,6 @@ if __name__ == "__main__":
         # test.include_time_vector=1
         test.in_bits = in_bits
         test.run_gen()
-        # pdb.set_trace()
         rand = np.random.rand(1000, 2) / 10000
 
         test.IOS.Members["in_dem"].Data = np.vstack(
