@@ -29,12 +29,6 @@ if not (os.path.abspath("../../thesdk") in sys.path):
 
 from thesdk import *
 
-# from rtl import *
-# from rtl.testbench import *
-# from rtl.testbench import testbench as vtb
-# from eldo import *
-# from eldo.testbench import *
-# from eldo.testbench import testbench as etb
 import pdb
 import numpy as np
 import scipy.signal as sig
@@ -51,6 +45,8 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
     def __init__(self, *arg):  # ,BW,osr,Nsymb,qam_type,bits
 
         self.print_log(type="I", msg="Inititalizing %s" % (__name__))
+
+        # Properties that can be propagated from parent
         self.proplist = [
             "signal_id",
             "BW",
@@ -61,28 +57,16 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
             "include_time_vector",
             "Fc_gen",
         ]
-        # Properties that can be propagated from parent
 
         self.IOS = Bundle()
-        # self.IOS.Members['A']=IO() # Pointer for input data
-        # self.IOS.Members['B']=IO() # Pointer for input data
-        # self.IOS.Members['C']=IO() # Pointer for input data
-        # self.IOS.Members['D']=IO() # Pointer for input data
-        # self.IOS.Members['E']=IO() # Pointer for input data
         self.IOS.Members["in_dem"] = IO()  # Pointer for input data
 
         self.IOS.Members["out"] = IO()  # Pointer for output data
-        # self.IOS.Members['Y']= IO()# Pointer for output data
-        # self.IOS.Members['X']= IO()# Pointer for output data
-        # self.IOS.Members['W']= IO()# Pointer for output data
-        # self.IOS.Members['V']= IO()# Pointer for output datai
-        # self.IOS.Members['U']= IO()# Pointer for output data
 
         self.BWP = np.array([[[4, 7, 0, 1]]])
         self.QAM = "64QAM"
         self.osr = 1
         self.BW = np.array([200e6])
-        # self.in_bits = np.array([[np.random.randint(2,size=4752*6)]])
         self.in_bits = np.array([["max"]])
 
         self.seed = 0
@@ -112,11 +96,6 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
             self.parent = parent
 
     def main_gen(self):
-        # self.BW=self.IOS.Members['A'].Data # Bandwidth as int 5-400 MHz. Negative BW leaves gap with selected width
-        # self.osr=self.IOS.Members['B'].Data # Oversampling ratio (integer)
-        # self.BWP=self.IOS.Members['C'].Data # List of bandwidth parts per carrier
-        # self.qam_type=self.IOS.Members['D'].Data # Modulation type (BPSK (Not in LTE standard), 4QAM, 16QAM, 64QAM or 256QAM)
-        # self.bits=self.IOS.Members['E'].Data # Inputdata as binary list
         if not hasattr(self.BW, "__len__"):
             self.BW = np.array([self.BW])
         if not hasattr(self.BW, "size"):
@@ -141,14 +120,10 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
             self.ACLR_BW = self.ACLR_BW[0]
         elif len(self.ACLR_BW) == 0:
             self.ACLR_BW = 0
-        # self.IOS.Members['Y'].Data=self.s_struct["cnstl"] # generated resource grid with PSS and CRS
-        # self.IOS.Members['X'].Data=self.cnstl # generated constellation points
 
     def run_gen(self, *arg):
         if self.model == "py":
             self.main_gen()
-
-        # del self.iofile_bundle
 
     def main_dem(self, **kwargs):
         car_return = kwargs.get("car_return", False)
@@ -163,9 +138,6 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
             car_return=car_return, sig_offset=sig_offset, NR_car_id=NR_car_id
         )
         self.dem_bits, self.dem_cnstl_vec = self.MultiQAMtoBit(NR_car_id=NR_car_id)
-        # self.IOS.Members['W'].Data=self.dem_bits # Outputdata as binary list
-        # self.IOS.Members['V'].Data=self.dem # Demodulated resource grid with PSS and CRS
-        # self.IOS.Members['U'].Data=self.dem_cnstl_vec # Demodulated contellation points
 
     def run_EVM(self, **kwargs):
         NR_car_id = kwargs.get("NR_car_id", -1)
@@ -186,8 +158,6 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
             self.main_dem(
                 car_return=car_return, sig_offset=sig_offset, NR_car_id=NR_car_id
             )
-
-        # del self.iofile_bundle
 
     def osr_based_on_Fc(self):
         BW_vect_abs = np.abs(self.BW)
@@ -231,8 +201,6 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
     def measMultiEVMdownlink(self, **kwargs):
         """Method for calculating EVM based on generated constellation points and recieved constellation points for multiple carriers.
 
-
-
         Example
         -------
         self.measMultiEVMdownlink()
@@ -248,7 +216,6 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
 
         N_BW = len(cnstl)
         EVM = []
-        # EVM=np.zeros(N_BW)
         rxDataSymbols = []
         # measure EVM separately for each constellation
         for i in range(0, N_BW):
@@ -275,8 +242,6 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
 
     def demMultiNRdownlink(self, **kwargs):
         """Method for demodulate constellation points from recieved signal for multiple carriers.
-
-
 
         Example
         -------
@@ -388,7 +353,6 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
                         stop = up["RB"] * BWP[i][j][3]
                         if stop < start:
                             raise Exception("Wrong BW of BWP")
-                            return None, None
 
                         sub_fs.append(up["Fs"])
                         LCM = np.lcm(LCM, int(up["Fs"]))
@@ -415,7 +379,6 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
             NFFT.append(sub_NFFT)
             Fss.append(sub_fs)
             slength.append(slen)
-            # NFFT=np.zeros(BW.size)
 
         # get integer proportional to overall sampling rate
         self.NFFT_debug = max(NFFT)
@@ -481,7 +444,6 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
                     )
                     smatrix = np.vstack([smatrix, zeros_matrix])
                 smatrix[0 : len(s), i] = self.normalize(x=s, opt="max", k=1)
-                # smatrix[0:len(s),i]=s
                 osr_ind = int(osr_ind + len(BWP[i]))
             else:
                 cnstlmatrix.append([])
@@ -492,15 +454,12 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
 
         # mix carriers to proper frequency offset
         f_off = np.zeros(N_BW)
-        # t_vect=np.arange(0,slength+self.fil_len*max(osr))/Fs
         t_vect = np.arange(0, slength + self.fil_len) / Fs
         for i in range(0, N_BW):
             BWi = BW[i]
 
             if BWi > 0:
                 f_off[i] = np.sum(BW_vect_abs[0:i]) + BWi / 2 - BWtot / 2
-                # f_off[i]=
-                test = smatrix[:, i] * np.exp(1j * 2 * np.pi * f_off[i] * t_vect)
                 s_raw = s_raw + smatrix[:, i] * np.exp(
                     1j * 2 * np.pi * (self.Fc_gen + f_off[i]) * t_vect
                 )
@@ -521,7 +480,6 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
 
     def genMultiQAM(self):
         """Method for generating QAM constellation points based on input bits for multiple carriers.
-
 
         Example
         -------
@@ -666,7 +624,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
 
         if BW < min_BW:
             raise Exception("Width of selected BWP is too small for selected mu")
-            return None
+
         NFFT = 2 ** np.ceil(np.log2(RB * 12 / 0.9))  # FFT size
         NFFT = max(128, NFFT)
         # NFFT=4096
@@ -899,7 +857,6 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         Nsymb = kwargs.get("Nsymb")
         RB = kwargs.get("RB")
 
-        # N_RB_maxDL = 110
         N_RB = int(RB * 12 / 2)
         r = np.zeros((N_RB, int(Nsymb)), complex)
         for i in range(0, int(Nsymb)):
@@ -1327,15 +1284,8 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
                 points.append(d)
                 points_as_bits.append(bits)
             for j in range(0, len(DataSymbols_nzero)):
-                test = np.array(points) - DataSymbols_nzero[j]
                 index = np.argmin(np.abs(np.array(points) - DataSymbols_nzero[j]))
                 bit_vect.extend(points_as_bits[index])
-
-                # if(j == int(1876/6-1) or j == int(1876/6) or j == int(1876/6+1)):
-                #    print(j, DataSymbols_nzero[j])
-
-                # if(j == int(5618/6-1) or j == int(5618/6) or j == int(5618/6+1)):
-                #    print(j, DataSymbols_nzero[j])
 
             cnstl_of_carrier.append(DataSymbols_nzero)
             vector.append(np.array(bit_vect))
@@ -1372,7 +1322,6 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         for n in range(0, len(BWP)):
             mu = BWP[n][0]
             dl = self.NRparameters(mu=mu, BW=BW, osr=osr[n], gen=1)
-            # N_RB_maxDL = 110  # largest downlink bandwidth (in Resource Blocks)
             N_ID_1 = 0  # physical-layer cell-identity group
             N_ID_2 = 0  # physical-layer identity within the group
             N_ID_cell = 3 * N_ID_1 + N_ID_2  # cell identity
@@ -1434,9 +1383,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
             unusedOFDM = unusedOFDM[np.lexsort((unusedOFDM[:, 0], unusedOFDM[:, 1]))]
 
             if len(cnstl[n]) > len(unusedOFDM):
-                raise Exception("Not enoigh OFDM symbols")
-                # print("Not enough OFDM symbols")
-                return None
+                raise Exception("Not enough OFDM symbols")
 
             for i in range(0, len(cnstl[n])):
                 l = unusedOFDM[i][1]
@@ -2135,11 +2082,6 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
                 / np.mean(np.abs(reference) ** 2, axis=0)
             )
         ) ** (1 / 2)
-
-        # always gets stuck on this for some reason
-        # fig=plt.figure()
-        # plt.plot(   ( np.abs(received-reference)**2 / np.mean(np.abs(reference)**2,axis=0) )**(1/2), drawstyle="steps-post")
-        # plt.show()
 
         return EVM, rxDataSymbols
 
