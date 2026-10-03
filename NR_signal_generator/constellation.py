@@ -24,243 +24,89 @@
 import numpy as np
 
 
-def modulate(bits, Ncnstl, qam_type, carrier_id, signal_id):
-    """Generate constellation points with the original bit preparation."""
-    qam = np.array([], complex)
-    if qam_type == "16QAM":
-        M = 16
-
-        if len(bits) > np.log2(M) * Ncnstl:
-            raise Exception(
-                "Not enough OFDM symbols. Max "
-                + str(int(np.log2(M) * Ncnstl))
-                + " bits or "
-                + str(Ncnstl)
-                + " constellation points"
-            )
-
-        if len(bits) != np.log2(M) * Ncnstl:
-            bits = np.pad(
-                bits, (0, int(np.log2(M) * Ncnstl - len(bits))), constant_values=0
-            )
-        for i in range(0, int(len(bits) / np.log2(M))):
-            d = (
-                1
-                / np.sqrt(10)
-                * (
-                    (1 - 2 * bits[4 * i]) * (2 - (1 - 2 * bits[4 * i + 2]))
-                    + 1j
-                    * (1 - 2 * bits[4 * i + 1])
-                    * (2 - (1 - 2 * bits[4 * i + 3]))
-                )
-            )
-            qam = np.append(qam, d)
-
-    elif qam_type == "4QAM":
-        M = 4
-        if len(bits) > np.log2(M) * Ncnstl:
-            raise Exception(
-                "Not enough OFDM symbols. Max "
-                + str(int(np.log2(M) * Ncnstl))
-                + " bits or "
-                + str(Ncnstl)
-                + " constellation points"
-            )
-        else:
-            if len(bits) != np.log2(M) * Ncnstl:
-                bits = np.pad(
-                    bits,
-                    (0, int(np.log2(M) * Ncnstl - len(bits))),
-                    constant_values=0,
-                )
-            for i in range(0, int(len(bits) / np.log2(M))):
-                d = (
-                    1
-                    / np.sqrt(2)
-                    * ((1 - 2 * bits[2 * i]) + 1j * (1 - 2 * bits[2 * i + 1]))
-                )
-                qam = np.append(qam, d)
-
-    elif qam_type == "BPSK":
-        M = 2
-
-        if len(bits) > np.log2(M) * Ncnstl:
-            raise Exception(
-                "Not enough OFDM symbols. Max "
-                + str(int(np.log2(M) * Ncnstl))
-                + " bits or "
-                + str(Ncnstl)
-                + " constellation points"
-            )
-
-        if len(bits) != np.log2(M) * Ncnstl:
-            bits = np.pad(
-                bits, (0, int(np.log2(M) * Ncnstl - len(bits))), constant_values=0
-            )
-        for i in range(0, int(len(bits) / np.log2(M))):
-            d = 1 / np.sqrt(2) * ((1 - 2 * bits[i]) + 1j * (1 - 2 * bits[i]))
-            qam = np.append(qam, d)
-
-    elif qam_type == "256QAM":
-        M = 256
-
-        if len(bits) > np.log2(M) * Ncnstl:
-            raise Exception(
-                "Not enough OFDM symbols. Max "
-                + str(int(np.log2(M) * Ncnstl))
-                + " bits or "
-                + str(Ncnstl)
-                + " constellation points"
-            )
-
-        if len(bits) != np.log2(M) * Ncnstl:
-            bits = np.pad(
-                bits, (0, int(np.log2(M) * Ncnstl - len(bits))), constant_values=0
-            )
-        for i in range(0, int(len(bits) / np.log2(M))):
-            d = (
-                1
-                / np.sqrt(170)
-                * (
-                    (1 - 2 * bits[8 * i])
-                    * (
-                        8
-                        - (1 - 2 * bits[8 * i + 2])
-                        * (
-                            4
-                            - (1 - 2 * bits[8 * i + 4])
-                            * (2 - (1 - 2 * bits[8 * i + 6]))
-                        )
-                    )
-                    + 1j
-                    * (1 - 2 * bits[8 * i + 1])
-                    * (
-                        8
-                        - (1 - 2 * bits[8 * i + 3])
-                        * (
-                            4
-                            - (1 - 2 * bits[8 * i + 5])
-                            * (2 - (1 - 2 * bits[8 * i + 7]))
-                        )
-                    )
-                )
-            )
-            qam = np.append(qam, d)
-
-    else:  # 64QAM
-        M = 64
-
-        if len(bits) > np.log2(M) * Ncnstl:
-            raise Exception(
-                "Not enough OFDM symbols. Max "
-                + str(int(np.log2(M) * Ncnstl))
-                + " bits or "
-                + str(Ncnstl)
-                + " constellation points"
-            )
-
-        if len(bits) != np.log2(M) * Ncnstl:
-            bits = np.pad(
-                bits, (0, int(np.log2(M) * Ncnstl - len(bits))), constant_values=0
-            )
-        for i in range(0, int(len(bits) / np.log2(M))):
-            d = (
-                1
-                / np.sqrt(42)
-                * (
-                    (1 - 2 * bits[6 * i])
-                    * (
-                        4
-                        - (1 - 2 * bits[6 * i + 2])
-                        * (2 - (1 - 2 * bits[6 * i + 4]))
-                    )
-                    + 1j
-                    * (1 - 2 * bits[6 * i + 1])
-                    * (
-                        4
-                        - (1 - 2 * bits[6 * i + 3])
-                        * (2 - (1 - 2 * bits[6 * i + 5]))
-                    )
-                )
-            )
-            qam = np.append(qam, d)
-
-    return qam, bits
+BITS_PER_SYMBOL = {
+    "BPSK": 1,
+    "QPSK": 2,
+    "16QAM": 4,
+    "64QAM": 6,
+    "256QAM": 8,
+    "1024QAM": 10,
+}
 
 
-def demodulate(DataSymbols_nzero, qam_type):
-    """Decode constellation points using the original nearest-point mapping."""
-    bit_vect = []
-    if qam_type == "16QAM":
-        M = 16
-        m = np.log2(M)
-    elif qam_type == "4QAM":
-        M = 4
-        m = np.log2(M)
-    elif qam_type == "BPSK":
-        M = 2
-        m = np.log2(M)
-    elif qam_type == "256QAM":
-        M = 256
-        m = np.log2(M)
-    else:  # 64QAM
-        M = 64
-        m = np.log2(M)
-    points = []
-    points_as_bits = []
-    for i in range(0, M):
-        bits = np.array(list(np.binary_repr(i, int(m))), dtype=int)
-        if qam_type == "16QAM":
-            d = (
-                1
-                / np.sqrt(10)
-                * (
-                    (1 - 2 * bits[0]) * (2 - (1 - 2 * bits[2]))
-                    + 1j * (1 - 2 * bits[1]) * (2 - (1 - 2 * bits[3]))
-                )
-            )
-        elif qam_type == "4QAM":
-            d = 1 / np.sqrt(2) * ((1 - 2 * bits[0]) + 1j * (1 - 2 * bits[1]))
+def _constellation(modulation):
+    """
+    Return NR constellation points and their corresponding bit labels.
 
-        elif qam_type == "BPSK":
-            d = 1 / np.sqrt(2) * ((1 - 2 * bits[0]) + 1j * (1 - 2 * bits[0]))
+    points: complex array of shape (M,)
+    labels: integer array of shape (M, bits_per_symbol)
 
-        elif qam_type == "256QAM":
-            d = (
-                1
-                / np.sqrt(170)
-                * (
-                    (1 - 2 * bits[0])
-                    * (
-                        8
-                        - (1 - 2 * bits[2])
-                        * (4 - (1 - 2 * bits[4]) * (2 - (1 - 2 * bits[6])))
-                    )
-                    + 1j
-                    * (1 - 2 * bits[1])
-                    * (
-                        8
-                        - (1 - 2 * bits[3])
-                        * (4 - (1 - 2 * bits[5]) * (2 - (1 - 2 * bits[7])))
-                    )
-                )
-            )
+    Labels are MSB-first, in ascending binary order.
+    The complete constellation has unit average symbol energy.
 
-        else:  # 64QAM
-            d = (
-                1
-                / np.sqrt(42)
-                * (
-                    (1 - 2 * bits[0])
-                    * (4 - (1 - 2 * bits[2]) * (2 - (1 - 2 * bits[4])))
-                    + 1j
-                    * (1 - 2 * bits[1])
-                    * (4 - (1 - 2 * bits[3]) * (2 - (1 - 2 * bits[5])))
-                )
-            )
-        points.append(d)
-        points_as_bits.append(bits)
-    for j in range(0, len(DataSymbols_nzero)):
-        index = np.argmin(np.abs(np.array(points) - DataSymbols_nzero[j]))
-        bit_vect.extend(points_as_bits[index])
-    return np.array(bit_vect)
+    Implements TS 38.211 sections 5.1.2 through 5.1.7.
+    Symbol-dependent pi/2-BPSK is not supported.
+    """
+    if not isinstance(modulation, str) or modulation not in BITS_PER_SYMBOL:
+        raise ValueError(f"Unsupported modulation: {modulation!r}")
+
+    m = BITS_PER_SYMBOL[modulation]
+    M = 1 << m
+
+    # Signed integers ensure 1 - 2*b produces +1 or -1 without wrapping.
+    indices = np.arange(M, dtype=np.int64)
+    shifts = np.arange(m - 1, -1, -1)
+    labels = (indices[:, None] >> shifts) & 1
+    signs = 1 - 2 * labels
+
+    if modulation == "BPSK":
+        # NR BPSK uses the diagonal constellation, not the real axis.
+        axis = signs[:, 0]
+        points = (axis + 1j * axis) / np.sqrt(2.0)
+    else:
+        # Even bit positions define I, odd positions define Q.
+        # Evaluate the nested NR PAM mapping from the innermost bits outward.
+        amplitude = np.ones((M, 2), dtype=np.int64)
+        for offset in range(m - 2, 0, -2):
+            amplitude = (1 << ((m - offset) // 2)) - signs[:, offset : offset + 2] * amplitude
+
+        iq = signs[:, :2] * amplitude
+
+        # Squared normalization: 2, 10, 42, 170, 682.
+        normalization = 2 * (M - 1) // 3
+        points = (iq[:, 0] + 1j * iq[:, 1]) / np.sqrt(normalization)
+
+    return points, labels
+
+
+def modulate(bits, modulation):
+    """
+    Map bits to NR constellation symbols.
+    """
+    points, labels = _constellation(modulation)
+    m = labels.shape[1]
+    bits = np.asarray(bits)
+
+    if bits.ndim != 1 or not np.all((bits == 0) | (bits == 1)):
+        raise ValueError("bits must be a one-dimensional sequence of 0 and 1")
+    if bits.size % m:
+        raise ValueError(f"bit count must be divisible by {m}")
+
+    groups = bits.astype(np.int64).reshape(-1, m)
+    weights = 1 << np.arange(m - 1, -1, -1)
+    return points[groups @ weights]
+
+
+def demodulate(symbols, modulation):
+    """
+    Map equalized NR constellation symbols to bits.
+    """
+    points, labels = _constellation(modulation)
+    symbols = np.asarray(symbols, dtype=np.complex128)
+
+    if symbols.ndim != 1 or not np.all(np.isfinite(symbols)):
+        raise ValueError("symbols must be a one-dimensional finite sequence")
+
+    distances = np.abs(symbols[:, None] - points[None, :])
+    nearest = np.argmin(distances, axis=1)
+    return labels[nearest].reshape(-1)
