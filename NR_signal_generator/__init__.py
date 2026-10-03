@@ -36,10 +36,7 @@ from scipy import interpolate as inter
 import matplotlib.pyplot as plt
 from plot_PSD import plot_PSD
 
-if __package__:
-    from .constellation import modulate, demodulate
-else:  # Support the existing direct __init__.py simulation entry point.
-    from constellation import modulate, demodulate
+from . import constellation
 
 
 class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
@@ -973,7 +970,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         unusedOFDM = np.transpose(np.where(RE == None))
         unusedOFDM = unusedOFDM[np.lexsort((unusedOFDM[:, 0], unusedOFDM[:, 1]))]
         Ncnstl = len(unusedOFDM)
-        return modulate(bits, Ncnstl, qam_type, carrier_id, self.signal_id)
+        return constellation.modulate(bits, Ncnstl, qam_type, carrier_id, self.signal_id)
 
     def QAMtoBit(self, **kwargs):
         """Method for generating binary array based on constellation points.
@@ -1047,7 +1044,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
 
             DataSymbols_nzero = DataSymbols_vect[np.argwhere(DataSymbols_vect)]
             cnstl_of_carrier.append(DataSymbols_nzero)
-            vector.append(demodulate(DataSymbols_nzero, qam_type))
+            vector.append(constellation.demodulate(DataSymbols_nzero, qam_type))
         return vector, cnstl_of_carrier
 
     def genNRdownlink(self, **kwargs):
@@ -1285,7 +1282,6 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         elif opt == "totpow":
             """TBD if needed"""
         return y
-
 
     def NRfilter(self, **kwargs):
         """Method for filtering signal.
@@ -1843,87 +1839,3 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         ) ** (1 / 2)
 
         return EVM, rxDataSymbols
-
-
-if __name__ == "__main__":
-    # import matplotlib.pyplot as plt
-    # from  NR_signal_studio import *
-    # from  NR_signal_studio.controller import controller as NR_signal_studio_controller
-
-    # length=1024
-    # method="multi"
-    # method="single"
-    # BWP=np.array([[[0,14,0,1],[0,14,0,1]],[[0,14,0,1],[1,14,0,1],[2,14,0,1]]])  #[mu, symbols, BW_low(0...1),BW_high(0...1)>BW_low]
-    # BWP=np.array([[[4,7,0,1]],[[4,7,0,1]]])
-    BWP = np.array([[[4, 7, 0, 1]]])
-    # BW=np.array([400e6,400e6])
-    BW = np.array([150e6])
-    # mu=[0,0]
-    # QAM="16QAM"
-    QAM = "64QAM"
-    # QAM="256QAM"
-    # QAM="4QAM"
-    # QAM="BPSK" # Not for downlink
-    # bits=np.array([0,0,0,1]*3816)
-
-    # bits=np.array(list(bits)*(int(240/4))) # same as ones in matlab nsymb 2 16qam
-    # bits=np.array(list(bits)*(int(6000)))
-    # bits=np.random.randint(2,size=1028*2)
-    # bits=np.random.randint(2,size=1710*6)
-    # bits2=np.random.randint(2,size=4752*6)
-    # bits3=np.random.randint(2,size=3738*6)
-    # bits=np.random.randint(2,size=1710*4)
-    # in_bits=[bits]*len(BW)
-    # in_bits =np.array([[bits2]])
-    in_bits = np.array([["max"]])
-    # in_bits=np.array([["max"],['max']])
-    osr = 1
-    Fc = 0  # 1e9
-    if not hasattr(BW, "__len__"):
-        a = 5
-    elif hasattr(BW, "__len__"):
-        test = NR_signal_generator()
-        # test.IOS.Members['in_dem']=test.IOS.Members['out']
-        test.BW = BW
-        test.BWP = BWP
-        test.QAM = QAM
-        test.osr = osr
-        test.Fc_gen = Fc
-        # test.include_time_vector=1
-        test.in_bits = in_bits
-        test.run_gen()
-        rand = np.random.rand(1000, 2) / 10000
-
-        test.IOS.Members["in_dem"].Data = np.vstack(
-            [rand, test.IOS.Members["out"].Data]
-        )
-        test.run_dem()
-        test.run_EVM()
-        a = np.transpose(
-            np.vstack((test.s_struct["s"][:, 0], test.s_struct["s"][:, 1]))
-        )
-        # np.savetxt('signal.csv',test.s_struct["s"],delimiter=',')
-
-        plt.figure()
-        plt.plot(test.s_struct["s"][:, 0], test.s_struct["s"][:, 1])
-        plt.plot(test.s_struct["s"][:, 0], test.s_struct["s"][:, 2])
-        plt.show(block=False)
-        print(test.EVM)
-        for i in range(0, BW.size):
-            for j in range(0, len(BWP[i])):
-                if test.EVM[i].any():
-                    if test.EVM[i][j] != 0:
-                        plt.figure()
-                        plt.plot(
-                            test.rxDataSymbols[i][j].real,
-                            test.rxDataSymbols[i][j].imag,
-                            "o",
-                        )
-                        plt.plot(test.cnstl[i][j].real, test.cnstl[i][j].imag, "o")
-                        plt.title("Carrier " + str(i + 1) + ", frame " + str(j + 1))
-                        plt.show(block=False)
-
-    # meas(test,test.s_struct["Fs"])
-    a = plot_PSD(test, 100, test.s_struct["Fs"])
-    print("tst")
-    input()
