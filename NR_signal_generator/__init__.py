@@ -1111,14 +1111,13 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
                 continue
             # re-create DMRS/PSS grid (i.e. post-FFT ideal reference signal)
             RE_id = np.ones((RE.shape), complex)
-            start = int(np.floor(dl["RB"] * BWP[n][2]) * 12)
-            stop = int(np.ceil(dl["RB"] * BWP[n][3]) * 12)
             values, is_ref = grid.reference_grid(
                 dl["RB"], N_symb_TOT, mu, BWP[n][2], BWP[n][3], N_ID_cell, N_ID_2
             )
             RE_id[is_ref] = values[is_ref]
+            pilots = grid.dmrs_mask(dl["RB"], N_symb_TOT, BWP[n][2], BWP[n][3])
 
-            cnstl = equalizer.equalize(RE, RE_id, start, stop)
+            cnstl = equalizer.equalize(RE, RE_id, pilots)
 
             cnstl_of_carrier.append(cnstl)
 

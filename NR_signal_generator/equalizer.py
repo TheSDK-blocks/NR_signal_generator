@@ -1,17 +1,17 @@
 import numpy as np
 
 
-def equalize(RE, RE_id, start, stop):
+def equalize(RE, RE_id, pilots):
     """
     Return the zero-forcing equalized resource-element grid (TS 38.104, Annex B.6).
 
     The equalizer coefficients are estimated from the complex ratios
-    Z(k, l) = RE(k, l) / RE_id(k, l) at the DMRS, on the even subcarriers k of
-    the BWP in the symbols l with l mod 14 = 2:
+    Z(k, l) = RE(k, l) / RE_id(k, l) at the pilots, on the subcarriers k and
+    symbols l of the pilot mask:
 
         A(k)   = mean_l |Z(k, l)|
         Phi(k) = mean_l unwrap_l(arg Z(k, l)),  unwrapping jumps of at least pi
-        A, Phi smoothed across the DMRS subcarriers k_j by a moving average of
+        A, Phi smoothed across the pilot subcarriers k_j by a moving average of
                2 h_j + 1 samples, h_j = min(j, K - 1 - j, 9)
         H(k)   = interp(A)(k) exp(j interp(Phi)(k)) for every subcarrier k
 
@@ -25,10 +25,9 @@ def equalize(RE, RE_id, start, stop):
     RE_id : array
         Ideal grid of the same shape: the DMRS and PSS values at their
         positions and 1 elsewhere
-    start : integer
-        First subcarrier of the BWP
-    stop : integer
-        Last subcarrier of the BWP plus one
+    pilots : array of bool
+        Pilot resource elements of shape (Nsc, Nsymb), the same subcarriers in
+        every pilot symbol, e.g. grid.dmrs_mask
 
     Returns
     -------
@@ -36,22 +35,19 @@ def equalize(RE, RE_id, start, stop):
 
     Example
     -------
-    equalize(RE, RE_id, start=0, stop=612)
+    equalize(RE, RE_id, pilots=dmrs_mask(n_rb=51, n_symb=14, lo=0, hi=1))
 
     """
-    Nsc, n_symb = RE.shape
-    if n_symb < 3:
-        raise ValueError(
-            f"no DMRS symbol: equalization needs at least 3 OFDM symbols, got {n_symb}"
-        )
+    if not pilots.any():
+        raise ValueError("no pilots: DMRS need at least 3 OFDM symbols")
 
-    k = np.arange(start, stop, 2)
-    l = np.flatnonzero(np.arange(n_symb) % 14 == 2)
+    k = np.flatnonzero(pilots.any(axis=1))
+    l = np.flatnonzero(pilots.any(axis=0))
     z = RE[np.ix_(k, l)] / RE_id[np.ix_(k, l)]
     amplitude = moving_average(np.abs(z).mean(axis=1))
     phase = moving_average(np.unwrap(np.angle(z), axis=1).mean(axis=1))
 
-    subcarriers = np.arange(Nsc)
+    subcarriers = np.arange(RE.shape[0])
     h = np.interp(subcarriers, k, amplitude) * np.exp(1j * np.interp(subcarriers, k, phase))
     return RE / h[:, None]
 
