@@ -539,9 +539,11 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         N_slot_in_subframe = 2**mu
         SCS = 2**mu * 15e3
 
-        min_BW = 20 * SCS * 12
-
         RB = numerology.n_rb(self.FR, mu, BW)
+        if RB < 20:
+            raise ValueError(
+                f"carrier of {RB} RBs at mu = {mu} cannot hold the 20 RB SS/PBCH block (TS 38.211, Section 7.4.3.1)"
+            )
         if gen == 1:
             self.BW_conf.append(RB * 12 * SCS)
         temp1 = [
@@ -576,9 +578,6 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         ]
         if BW in temp1 and gen == 1:
             self.ACLR_BW.append(temp2[np.where(temp1 == BW)[0][0]])
-
-        if BW < min_BW:
-            raise Exception("Width of selected BWP is too small for selected mu")
 
         NFFT = 2 ** np.ceil(np.log2(RB * 12 / 0.9))  # FFT size
         NFFT = max(128, NFFT)
