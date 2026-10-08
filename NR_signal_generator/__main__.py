@@ -11,9 +11,9 @@ from . import NR_signal_generator
 # method="single"
 # BWP=np.array([[[0,14,0,1],[0,14,0,1]],[[0,14,0,1],[1,14,0,1],[2,14,0,1]]])  #[mu, symbols, BW_low(0...1),BW_high(0...1)>BW_low]
 # BWP=np.array([[[4,7,0,1]],[[4,7,0,1]]])
-BWP = np.array([[[4, 8, 0, 48]]])
+BWP = np.array([[[1, 7, 0, 273]]])
 # BW=np.array([400e6,400e6])
-BW = np.array([150e6])
+BW = np.array([100e6])
 # mu=[0,0]
 # QAM="16QAM"
 QAM = "64QAM"
