@@ -279,7 +279,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
                     carrier_offset = self.Fc_gen + f_off[i] + sig_offset
                     v_mixed = s * np.exp(-1j * 2 * np.pi * carrier_offset * t)
                 # calculate OSR of current carrier
-                dl_osrl = self.NRparameters(mu=BWP[i][0], BW=BW[i])
+                dl_osrl = numerology.nr_parameters(self.FR, BWP[i][0], BW[i])
                 osr = np.around(Fs / dl_osrl["Fs"])
 
                 v_filt = v_mixed
@@ -325,7 +325,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         slength = np.zeros(N_BW)
         for i in range(0, N_BW):
             if BW[i] != 0:
-                up = self.NRparameters(mu=BWP[i][0], BW=BW_vect_abs[i])
+                up = numerology.nr_parameters(self.FR, BWP[i][0], BW_vect_abs[i])
                 Fss.append(up["Fs"])
                 LCM = np.lcm(LCM, int(up["Fs"]))
                 if BW[i] > 0:
@@ -425,96 +425,6 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
                 gen_bits.append([])
         return cnstl, gen_bits
 
-    def NRparameters(self, **kwargs):
-        """Method for calculating necessary parameters
-
-        Parameters
-        ----------
-        mu : integer (0,1,2,3)
-           5G NR numerology
-        BW : integer
-            Bandwidth of carrier, a channel bandwidth of self.FR
-        osr : integer
-            Oversampling factor
-
-        Example
-        -------
-        self.NRparameters(mu=1, BW=10e6, osr= 1)
-
-        """
-
-        mu = kwargs.get("mu")
-        BW = kwargs.get("BW")
-        gen = kwargs.get("gen", 0)
-        N_slot_in_subframe = 2**mu
-        SCS = 2**mu * 15e3
-
-        RB = numerology.n_rb(self.FR, mu, BW)
-        if RB < 20:
-            raise ValueError(
-                f"carrier of {RB} RBs at mu = {mu} cannot hold the 20 RB SS/PBCH block (TS 38.211, Section 7.4.3.1)"
-            )
-        if gen == 1:
-            self.BW_conf.append(RB * 12 * SCS)
-            # ACLR filter: transmission bandwidth configuration of the SCS that
-            # provides the largest one (TS 38.104, Table 6.6.3.2-1, Note 2)
-            bw_config = [
-                n_rb[BW / 1e6] * 12 * 15e3 * 2**m
-                for m, n_rb in numerology.N_RB[self.FR].items()
-                if BW / 1e6 in n_rb
-            ]
-            self.ACLR_BW.append(max(bw_config))
-
-        NFFT = 2 ** np.ceil(np.log2(RB * 12 / 0.9))  # FFT size
-        NFFT = max(128, NFFT)
-        # NFFT=4096
-        Tc = 1 / (15e3 * 2**mu * NFFT)
-        Ts = 1 / (15e3 * 2048)
-        k = Ts / Tc
-        Fs = NFFT * SCS  # sampling frequency
-        Ncp1 = 144 * k * (1 / (2**mu)) + 16 * k  # length of cyclic prefix 0 and 7*2**mu
-        Ncp2 = 144 * k * (1 / (2**mu))  # length of cyclic prefixes else
-        Nofdm1 = NFFT + Ncp1  # length of OFDM symbol 0
-        Nofdm2 = NFFT + Ncp2  # length of OFDM symbols 1-6
-
-        if "osr" in kwargs:
-            osr = kwargs.get("osr")
-        else:
-            osr = 1
-
-        # set parameters that are not proportional to BW:
-        # - W     = EVM window length
-        # - Lroll = optimum symbol rolloff length to keep EVM < 1%
-        # - RB    = number of Resource Blocks
-        Lroll = 0
-        if NFFT == 128:
-            Lroll = 4
-        elif NFFT == 256:
-            Lroll = 6
-        elif NFFT == 512:
-            Lroll = 4
-        elif NFFT == 1024:
-            Lroll = 6
-        elif NFFT == 2048:
-            Lroll = 8
-        if Lroll == 0:
-            Lroll = max(0, 8 - 2 * (11 - (np.log2(NFFT))))
-        up = {
-            "Fs": Fs * osr,
-            "NFFT": NFFT * osr,
-            "Ncp1": Ncp1 * osr,
-            "Ncp2": Ncp2 * osr,
-            "Nofdm1": Nofdm1 * osr,
-            "Nofdm2": Nofdm2 * osr,
-            # "Nslot":Nslot*osr,
-            # "W":W*osr,
-            "RB": RB,
-            "Nsc": RB * 12,  # number of occupied subcarriers
-            "Lroll": Lroll,
-        }
-
-        return up
-
     def genQAM(self, **kwargs):
         """Method for generating constellation point based on input bits.
 
@@ -541,7 +451,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         BWP = kwargs.get("BWP")
 
         qam_type = self.QAM
-        dl = self.NRparameters(mu=BWP[0], BW=BW)
+        dl = numerology.nr_parameters(self.FR, BWP[0], BW)
         Nsymb = int(BWP[1])
         Ncnstl = int(grid.data_re_mask(dl["RB"], Nsymb, BWP[2], BWP[3]).sum())
 
@@ -580,7 +490,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         qam_type = self.QAM
 
         mu = BWP[0]
-        dl = self.NRparameters(mu=mu, BW=BW)  # get NR parameters
+        dl = numerology.nr_parameters(self.FR, mu, BW)  # get NR parameters
         N_ID_1 = 0  # physical-layer cell-identity group
         N_ID_2 = 0  # physical-layer identity within the group
         N_ID_cell = 3 * N_ID_1 + N_ID_2  # cell identity
@@ -618,7 +528,16 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         cnstl = kwargs.get("cnstl")
 
         mu = BWP[0]
-        dl = self.NRparameters(mu=mu, BW=BW, osr=osr, gen=1)
+        dl = numerology.nr_parameters(self.FR, mu, BW, osr)
+        self.BW_conf.append(dl["RB"] * 12 * 2**mu * 15e3)
+        # ACLR filter: transmission bandwidth configuration of the SCS that
+        # provides the largest one (TS 38.104, Table 6.6.3.2-1, Note 2)
+        bw_config = [
+            n_rb[BW / 1e6] * 12 * 15e3 * 2**m
+            for m, n_rb in numerology.N_RB[self.FR].items()
+            if BW / 1e6 in n_rb
+        ]
+        self.ACLR_BW.append(max(bw_config))
         N_ID_1 = 0  # physical-layer cell-identity group
         N_ID_2 = 0  # physical-layer identity within the group
         N_ID_cell = 3 * N_ID_1 + N_ID_2  # cell identity
@@ -725,7 +644,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         dF = 0
         for mu in range(0, 5):
             try:
-                up = self.NRparameters(mu=(4 - mu), BW=BW)
+                up = numerology.nr_parameters(self.FR, 4 - mu, BW)
                 if ((up["RB"]) * 12 * 15e3 * 2 ** (4 - mu)) > dF:
                     dF = (up["RB"]) * 12 * 15e3 * 2 ** (4 - mu)
             except:
@@ -879,7 +798,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         N_symb_TOT = int(BWP[1])
 
         # get various parameters related to input signal
-        dl = self.NRparameters(mu=mu, BW=BW, osr=osr)  # general NR parameters
+        dl = numerology.nr_parameters(self.FR, mu, BW, osr)  # general NR parameters
         ncp = numerology.nr_cp_lengths(N_symb_TOT, mu, dl)
         starts = ofdm.symbol_starts(ncp, dl["NFFT"])
         sign = s
@@ -943,7 +862,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         Nsc_rx, N_symb_rx = dem.shape
         if Nsc != Nsc_rx or N_symb != N_symb_rx:
             return 0, 0
-        dl = self.NRparameters(mu=mu, BW=BW)  # get NR parameters
+        dl = numerology.nr_parameters(self.FR, mu, BW)  # get NR parameters
         N_ID_1 = 0  # physical-layer cell-identity group
         N_ID_2 = 0  # physical-layer identity within the group
         N_ID_cell = 3 * N_ID_1 + N_ID_2  # cell identity

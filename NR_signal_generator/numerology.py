@@ -67,7 +67,7 @@ def nr_cp_lengths(n_symb, mu, num):
     mu : integer (0,1,2,3,4)
         5G NR numerology
     num : dict
-        NR parameters as returned by NRparameters, with keys "Ncp1" and "Ncp2"
+        NR parameters as returned by nr_parameters, with keys "Ncp1" and "Ncp2"
 
     Returns
     -------
@@ -75,8 +75,83 @@ def nr_cp_lengths(n_symb, mu, num):
 
     Example
     -------
-    nr_cp_lengths(n_symb=14, mu=1, num=self.NRparameters(mu=1, BW=20e6))
+    nr_cp_lengths(n_symb=14, mu=1, num=nr_parameters("FR1", 1, 20e6))
 
     """
     long_cp = np.arange(n_symb) % (7 * 2**mu) == 0
     return np.where(long_cp, num["Ncp1"], num["Ncp2"])
+
+
+def nr_parameters(fr, mu, bw, osr=1):
+    """
+    Return the carrier parameters of numerology mu and channel bandwidth bw.
+
+    Parameters
+    ----------
+    fr : string ("FR1", "FR2-1")
+        Frequency range
+    mu : integer (0,1,2,3)
+        5G NR numerology
+    bw : float
+        Channel bandwidth in Hz
+    osr : integer
+        Oversampling factor
+
+    Returns
+    -------
+    Dictionary with keys Fs, NFFT, Ncp1, Ncp2, Nofdm1, Nofdm2 (scaled by osr),
+    RB, Nsc and Lroll.
+    """
+    N_slot_in_subframe = 2**mu
+    SCS = 2**mu * 15e3
+
+    RB = n_rb(fr, mu, bw)
+    if RB < 20:
+        raise ValueError(
+            f"carrier of {RB} RBs at mu = {mu} cannot hold the 20 RB SS/PBCH block (TS 38.211, Section 7.4.3.1)"
+        )
+
+    NFFT = 2 ** np.ceil(np.log2(RB * 12 / 0.9))  # FFT size
+    NFFT = max(128, NFFT)
+    # NFFT=4096
+    Tc = 1 / (15e3 * 2**mu * NFFT)
+    Ts = 1 / (15e3 * 2048)
+    k = Ts / Tc
+    Fs = NFFT * SCS  # sampling frequency
+    Ncp1 = 144 * k * (1 / (2**mu)) + 16 * k  # length of cyclic prefix 0 and 7*2**mu
+    Ncp2 = 144 * k * (1 / (2**mu))  # length of cyclic prefixes else
+    Nofdm1 = NFFT + Ncp1  # length of OFDM symbol 0
+    Nofdm2 = NFFT + Ncp2  # length of OFDM symbols 1-6
+
+    # set parameters that are not proportional to BW:
+    # - W     = EVM window length
+    # - Lroll = optimum symbol rolloff length to keep EVM < 1%
+    # - RB    = number of Resource Blocks
+    Lroll = 0
+    if NFFT == 128:
+        Lroll = 4
+    elif NFFT == 256:
+        Lroll = 6
+    elif NFFT == 512:
+        Lroll = 4
+    elif NFFT == 1024:
+        Lroll = 6
+    elif NFFT == 2048:
+        Lroll = 8
+    if Lroll == 0:
+        Lroll = max(0, 8 - 2 * (11 - (np.log2(NFFT))))
+    up = {
+        "Fs": Fs * osr,
+        "NFFT": NFFT * osr,
+        "Ncp1": Ncp1 * osr,
+        "Ncp2": Ncp2 * osr,
+        "Nofdm1": Nofdm1 * osr,
+        "Nofdm2": Nofdm2 * osr,
+        # "Nslot":Nslot*osr,
+        # "W":W*osr,
+        "RB": RB,
+        "Nsc": RB * 12,  # number of occupied subcarriers
+        "Lroll": Lroll,
+    }
+
+    return up
