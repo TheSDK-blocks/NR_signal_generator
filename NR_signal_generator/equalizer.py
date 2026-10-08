@@ -36,7 +36,7 @@ def equalize(RE, RE_id, start, stop):
 
     # calculate the complex ratios of the post-FFT acquired signal "RE" and the
     # post-FFT ideal signal "RE_id", for each reference symbol
-    complex_ratios = np.divide(RE, RE_id)
+    complex_ratios = np.divide(RE, RE_id, out=np.zeros_like(RE), where=RE_id != 0)
     a = np.absolute(complex_ratios)
     phi = np.angle(complex_ratios)
     #  unwrap phase of complex ratios at symbol #0 of each slot
