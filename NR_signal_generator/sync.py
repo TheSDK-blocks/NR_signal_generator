@@ -1,4 +1,5 @@
 import numpy as np
+from scipy import signal
 
 from . import sequences
 
@@ -33,5 +34,5 @@ def pss_align(x, nfft, pss_start, n_id2):
 
     """
     replica = np.fft.ifft(np.roll(np.pad(sequences.pss(n_id2), (0, int(nfft) - 127)), -64))
-    delay = np.argmax(np.abs(np.correlate(x, replica, "full"))) - (len(replica) - 1)
+    delay = np.argmax(np.abs(signal.correlate(x, replica, "full"))) - (len(replica) - 1)
     return np.roll(x, int(pss_start - delay))
