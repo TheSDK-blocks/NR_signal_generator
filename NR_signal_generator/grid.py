@@ -11,6 +11,10 @@ def pss_symbol(n_symb):
     symbols carry it in their last symbol instead, moved one symbol earlier
     if that symbol carries DMRS (l mod 14 = 2), so the two never collide.
 
+    This placement is a simplification, not TS 38.213 compliant: the SS/PBCH
+    block candidate positions of TS 38.213, Section 4.1, its periodicity and
+    its SSS and PBCH are not modelled.
+
     Parameters
     ----------
     n_symb : integer
@@ -69,6 +73,10 @@ def reference_grid(n_rb, n_symb, mu, lo, hi, n_id_cell, n_id2):
     sequence restarts every frame of 140 * 2^mu symbols.
     PSS: 240 subcarriers centred in the carrier, [0]*56 + d_PSS + [0]*57,
     in symbol pss_symbol(n_symb).
+
+    This is a simplified NR-like layout, not TS 38.211 compliant: the PSS is
+    sent without the rest of the SS/PBCH block (SSS, PBCH and its DMRS), and
+    is centred in the carrier instead of placed on the synchronization raster.
     """
     n_sc = 12 * n_rb
     start = int(np.floor(n_rb * lo) * 12)
