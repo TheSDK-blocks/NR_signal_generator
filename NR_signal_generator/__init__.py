@@ -625,31 +625,11 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         Nsymb = int(BWP[1])
         ncp = numerology.nr_cp_lengths(Nsymb, mu, dl)
 
-        # RE=np.copy(cnstl)
-        RE = np.full((dl["Nsc"], Nsymb), None)
-        start = 12 * int(BWP[2])
-        stop = 12 * int(BWP[2] + BWP[3])
-        RE[:start, :] = 0
-        RE[stop:, :] = 0
-        # RE=np.zeros((dl["Nsc"],Nsymb),complex)
         values, is_ref = grid.reference_grid(
             dl["RB"], Nsymb, mu, BWP[2], BWP[3], N_ID_cell, N_ID_2
         )
-        RE[is_ref] = values[is_ref]
-
         mask = grid.data_re_mask(dl["RB"], Nsymb, BWP[2], BWP[3])
-        unusedOFDM = np.argwhere(mask.T)[:, ::-1]
-
-        if len(cnstl) > len(unusedOFDM):
-            raise Exception("Not enough OFDM symbols")
-
-        for i in range(0, len(cnstl)):
-            l = unusedOFDM[i][1]
-            k = unusedOFDM[i][0]
-            RE[k, l] = cnstl[i]
-
-        RE[RE == None] = 0 + 0 * 1j
-        RE = RE.astype(complex)
+        RE = grid.map_data(values, mask, cnstl)
 
         s = ofdm.modulate(RE, dl["NFFT"], ncp, dl["Lroll"] * osr)
         out = {"s": s, "cnstl": RE, "Fs": dl["Fs"]}

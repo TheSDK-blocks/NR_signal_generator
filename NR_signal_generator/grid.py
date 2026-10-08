@@ -173,3 +173,28 @@ def data_symbols(re_grid, mask):
 
     """
     return re_grid.T[mask.T]
+
+
+def map_data(re_grid, mask, symbols):
+    """
+    Return a copy of re_grid with symbols mapped in data_symbols order.
+
+    Parameters
+    ----------
+    re_grid : array
+        Resource-element grid of shape (Nsc, Nsymb)
+    mask : array of bool
+        Data resource elements of the grid
+    symbols : array
+        Data symbols, at most mask.sum()
+
+    Returns
+    -------
+    Complex array of shape (Nsc, Nsymb).
+    """
+    l, k = np.nonzero(mask.T)
+    if len(symbols) > len(k):
+        raise ValueError(f"{len(symbols)} data symbols do not fit {len(k)} data resource elements")
+    out = np.array(re_grid, complex)
+    out[k[: len(symbols)], l[: len(symbols)]] = symbols
+    return out
