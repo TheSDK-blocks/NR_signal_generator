@@ -71,21 +71,7 @@ def equalize(RE, RE_id, start, stop):
     # OFDM symbols)
     a_coeff = np.zeros((int(Nsc)))
     phi_coeff = np.zeros((int(Nsc)))
-    k_PSS = np.arange(0, 240) - np.ceil(240 / 2) + Nsc / 2
     k = np.arange(start, stop, 2)
-
-    if N_symb_TOT == 3:  # exclude 5+5 null reference subcarriers around the PSS
-        for i in np.concatenate((range(0, 56), range(182, 239))):
-            if np.any(k + 1 == k_PSS[i]):
-                ind_k_to_remove = np.argwhere(k + 1 == k_PSS[i])
-                k = k[
-                    np.concatenate(
-                        (
-                            np.arange(0, ind_k_to_remove - 1),
-                            np.arange(ind_k_to_remove, -1),
-                        )
-                    )
-                ]
 
     for i in np.arange(1, k.size + 1):
         m_avg_w_length = min(2 * i - 1, 2 * (k.size - i) + 1, 19)

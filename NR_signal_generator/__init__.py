@@ -1100,7 +1100,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
             if N_symb_TOT == 0:
                 print("ERROR")
                 return 0
-            l_pss = min(N_symb_TOT, 4) - 1
+            l_pss = grid.pss_symbol(N_symb_TOT)
             invect_aligned = sync.pss_align(sign, dl["NFFT"], starts[l_pss] + ncp[l_pss], N_ID_2)
 
             RE = ofdm.demodulate(invect_aligned, dl["NFFT"], ncp, dl["Nsc"])
