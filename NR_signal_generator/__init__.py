@@ -795,7 +795,6 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
             N_ID_cell = 3 * N_ID_1 + N_ID_2  # cell identity
             Nsymb = int(BWP[n][1])
             ncp = numerology.nr_cp_lengths(Nsymb, mu, dl)
-            Nsamples = ofdm.symbol_starts(ncp, dl["NFFT"])[-1]
 
             # RE=np.copy(cnstl)
             RE = np.full((dl["Nsc"], Nsymb), None)
@@ -827,82 +826,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
             RE[RE == None] = 0 + 0 * 1j
             RE = RE.astype(complex)
 
-            # map resource elements to modulated subcarriers
-            subcarriers = np.zeros((int(dl["NFFT"]), Nsymb), complex)
-            subcarriers[int(dl["NFFT"] - dl["Nsc"] / 2) : int(dl["NFFT"])] = RE[
-                0 : int(dl["Nsc"] / 2)
-            ]
-            subcarriers[0 : int(dl["Nsc"] / 2)] = RE[int(dl["Nsc"] / 2) :]
-
-            OFDMsymbols = np.transpose(
-                np.fft.ifft(np.transpose(subcarriers))
-            )  # convert the subcarrier spectrum to time domain
-            ext_symbols = np.concatenate(
-                (OFDMsymbols, OFDMsymbols, OFDMsymbols)
-            )  # extend symbols prior to windowing
-            # set up Tukey window
-            Lr = dl["Lroll"] * osr[n]  # symbol rolloff length accounting for osr
-            w_rise = 0.5 * (
-                1 + np.cos(np.pi * np.arange(Lr + 1, 2 * Lr + 1) / Lr)
-            )  # window start
-            w_fade = 0.5 * (1 + np.cos(np.pi * np.arange(0, Lr) / Lr))  # window end
-            # create Tukey window for the first OFDM symbol of each slot
-            w_ofdm1 = np.zeros(int(3 * dl["NFFT"]), complex)
-            w_ofdm1[
-                int(dl["NFFT"] - dl["Ncp1"] - Lr) : int(dl["NFFT"] - dl["Ncp1"])
-            ] = w_rise  # window start
-            w_ofdm1[int(2 * dl["NFFT"] - 1) : int(2 * dl["NFFT"] + Lr - 1)] = w_fade  # window end
-            w_ofdm1[int(dl["NFFT"] - dl["Ncp1"]) : int(2 * dl["NFFT"] - 1)] = 1  # window center
-            # create Tukey window for OFDM symbols 2 to 7 of each slot
-            w_ofdm2to7 = np.zeros(int(3 * dl["NFFT"]), complex)
-            w_ofdm2to7[
-                int(dl["NFFT"] - dl["Ncp2"] - Lr) : int(dl["NFFT"] - dl["Ncp2"])
-            ] = w_rise
-            w_ofdm2to7[int(2 * dl["NFFT"] - 1) : int(2 * dl["NFFT"] + Lr - 1)] = w_fade
-            w_ofdm2to7[int(dl["NFFT"] - dl["Ncp2"]) : int(2 * dl["NFFT"] - 1)] = 1
-
-            win_symbols = np.zeros((int(3 * dl["NFFT"]), Nsymb), complex)
-            # apply windowing to OFDM symbols
-            for i in range(1, Nsymb + 1):
-                if i == 1 or (i % (7 * 2**mu)) == 1:  # use first Tukey window
-                    win_symbols[:, i - 1] = ext_symbols[:, i - 1] * w_ofdm1
-                else:  # use second Tukey window
-                    win_symbols[:, i - 1] = ext_symbols[:, i - 1] * w_ofdm2to7
-            # align OFDM symbols on the rows of a matrix (REALLY cryptic code!)
-            xdim = Nsymb + 2
-            ydim = dl["Nofdm1"] + Nsamples + 3 * dl["NFFT"]
-            sum_matrix = np.zeros((int(xdim), int(ydim)), complex)
-            sum_matrix[0, 0 : int(3 * dl["NFFT"])] = win_symbols[
-                :, -1
-            ]  # place front-end OFDM symbol
-
-            for i in range(0, Nsymb):
-                long_cp = np.floor(i / (7 * 2**mu))  # current slot (in samples)
-                short_cp = i - long_cp  # current OFDM symbol in the slot
-                i1 = int(
-                    dl["Nofdm1"] + long_cp * dl["Nofdm1"] + short_cp * dl["Nofdm2"] + 1
-                )  # start index
-                i2 = int(
-                    dl["Nofdm1"]
-                    + long_cp * dl["Nofdm1"]
-                    + short_cp * dl["Nofdm2"]
-                    + 3 * dl["NFFT"]
-                )  # end index
-                sum_matrix[i + 1, i1 - 1 : i2] = win_symbols[:, i]  # place symbol
-
-            sum_matrix[Nsymb + 1, int(-3 * dl["NFFT"]) :] = win_symbols[
-                :, 0
-            ]  # place back-end OFDM symbol
-
-            sum_vector = sum_matrix.sum(axis=0)  # sum each column of the matrix
-            raw_vector = sum_vector[
-                int(2 * dl["NFFT"]) : int(2 * dl["NFFT"] + Nsamples)
-            ]  # discard tails of SC-FDMA vector
-
-            final_vector = raw_vector
-
-            # s=self.normalize(final_vector,"max",1) # normalize output signal to 1
-            s = final_vector
+            s = ofdm.modulate(RE, dl["NFFT"], ncp, dl["Lroll"] * osr[n])
 
             signal.append(s)
             REs.append(RE)
