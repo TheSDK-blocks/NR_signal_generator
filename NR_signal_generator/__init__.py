@@ -37,6 +37,7 @@ import matplotlib.pyplot as plt
 from plot_PSD import plot_PSD
 
 from . import constellation
+from . import grid
 
 
 class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
@@ -945,31 +946,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         qam_type = self.QAM
         dl = self.NRparameters(mu=BWP[0], BW=BW)
         Nsymb = int(BWP[1])
-        RE = np.full((dl["Nsc"], Nsymb), None)
-        start = int(np.floor(dl["RB"] * BWP[2]) * 12)
-        stop = int(np.ceil(dl["RB"] * BWP[3]) * 12)
-
-        RE[:start, :] = 0
-        RE[stop:, :] = 0
-
-        # set DMRS symbols to zero
-        k = np.arange(start, stop, 2)
-
-        for l in range(0, int(Nsymb)):
-            if l % 14 == 2:
-                RE[k, l] = 0
-
-        # set PSS symbols to zero
-        # if n==0:
-        l = min([Nsymb, 4]) - 1  # if signal shorter that 4 symbols --> anticipate PSS!
-        k = np.arange(0, 240) - np.ceil(240 / 2) + dl["Nsc"] / 2
-        first = int(k[0])
-        last = int(k[-1])
-        RE[first : last + 1, l] = 0
-
-        unusedOFDM = np.transpose(np.where(RE == None))
-        unusedOFDM = unusedOFDM[np.lexsort((unusedOFDM[:, 0], unusedOFDM[:, 1]))]
-        Ncnstl = len(unusedOFDM)
+        Ncnstl = int(grid.data_re_mask(dl["RB"], Nsymb, BWP[2], BWP[3]).sum())
 
         if bits == "max":
             seed = (carrier_id + self.signal_id * 13 + 1) * 123
@@ -1018,29 +995,9 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
             N_ID_cell = 3 * N_ID_1 + N_ID_2  # cell identity
             # initialize data constellations (non-normalized)
             DataSymbols_nnorm = np.copy(cnstl[n])
-            start = int(np.floor(dl["RB"] * BWP[n][2]) * 12)
-            stop = int(np.ceil(dl["RB"] * BWP[n][3]) * 12)
             Nsymb = int(BWP[n][1])
-
-            DataSymbols_nnorm[:start, :] = 0
-            DataSymbols_nnorm[stop:, :] = 0
-
-            # set DMRS symbols to zero
-            k = np.arange(start, stop, 2)
-
-            for l in range(0, int(Nsymb)):
-                if l % 14 == 2:
-                    DataSymbols_nnorm[k, l] = 0
-
-            # set PSS symbols to zero
-            # if n==0:
-            l = (
-                min([Nsymb, 4]) - 1
-            )  # if signal shorter that 4 symbols --> anticipate PSS!
-            k = np.arange(0, 240) - np.ceil(240 / 2) + dl["Nsc"] / 2
-            first = int(k[0])
-            last = int(k[-1])
-            DataSymbols_nnorm[first : last + 1, l] = 0
+            mask = grid.data_re_mask(dl["RB"], Nsymb, BWP[n][2], BWP[n][3])
+            DataSymbols_nnorm[~mask] = 0
 
             # vectorize constellations
             DataSymbols_vect = np.reshape(
@@ -1051,7 +1008,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
 
             DataSymbols_nzero = DataSymbols_vect[np.argwhere(DataSymbols_vect)]
             cnstl_of_carrier.append(DataSymbols_nzero)
-            vector.append(constellation.demodulate(DataSymbols_nzero, qam_type))
+            vector.append(constellation.demodulate(DataSymbols_nzero.flatten(), qam_type))
         return vector, cnstl_of_carrier
 
     def genNRdownlink(self, **kwargs):
@@ -1142,8 +1099,8 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
                 (np.zeros(56), d_PSS, np.zeros(57))
             )  # set  edge subcarriers to 0
 
-            unusedOFDM = np.transpose(np.where(RE == None))
-            unusedOFDM = unusedOFDM[np.lexsort((unusedOFDM[:, 0], unusedOFDM[:, 1]))]
+            mask = grid.data_re_mask(dl["RB"], Nsymb, BWP[n][2], BWP[n][3])
+            unusedOFDM = np.argwhere(mask.T)[:, ::-1]
 
             if len(cnstl[n]) > len(unusedOFDM):
                 raise Exception("Not enough OFDM symbols")
@@ -1778,27 +1735,9 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         # initialize data constellations (non-normalized)
         rxDataSymbols_nnorm = np.copy(dem)
         refDataSymbols_nnorm = np.copy(cnstl)
-        # set DMRS symbols to zero
-        start = int(np.floor(dl["RB"] * BWP[2]) * 12)
-        stop = int(np.ceil(dl["RB"] * BWP[3]) * 12)
-        rxDataSymbols_nnorm[:start, :] = 0
-        rxDataSymbols_nnorm[stop:, :] = 0
-        refDataSymbols_nnorm[:start, :] = 0
-        refDataSymbols_nnorm[stop:, :] = 0
-        k = np.arange(start, stop, 2)
-
-        for l in range(0, int(N_symb)):
-            if l % 14 == 2:
-                rxDataSymbols_nnorm[k, l] = 0
-                refDataSymbols_nnorm[k, l] = 0
-
-        # set PSS symbols to zero
-        l = min([N_symb, 4]) - 1  # if signal shorter that 4 symbols --> anticipate PSS!
-        k = np.arange(0, 240) - np.ceil(240 / 2) + dl["Nsc"] / 2
-        first = int(k[0])
-        last = int(k[-1])
-        rxDataSymbols_nnorm[first : last + 1, l] = 0
-        refDataSymbols_nnorm[first : last + 1, l] = 0
+        mask = grid.data_re_mask(dl["RB"], N_symb, BWP[2], BWP[3])
+        rxDataSymbols_nnorm[~mask] = 0
+        refDataSymbols_nnorm[~mask] = 0
 
         # vectorize constellations
         rxDataSymbols_vect = np.reshape(
