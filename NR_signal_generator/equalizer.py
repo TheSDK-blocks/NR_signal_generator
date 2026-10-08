@@ -33,6 +33,10 @@ def equalize(RE, RE_id, start, stop):
 
     """
     Nsc, N_symb_TOT = RE.shape
+    if N_symb_TOT < 3:
+        raise ValueError(
+            f"no DMRS symbol: equalization needs at least 3 OFDM symbols, got {N_symb_TOT}"
+        )
 
     # calculate the complex ratios of the post-FFT acquired signal "RE" and the
     # post-FFT ideal signal "RE_id", for each reference symbol
