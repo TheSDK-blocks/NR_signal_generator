@@ -99,59 +99,35 @@ def nr_parameters(fr, mu, bw, osr=1):
 
     Returns
     -------
-    Dictionary with keys Fs, NFFT, Ncp1, Ncp2, Nofdm1, Nofdm2 (scaled by osr),
-    RB, Nsc and Lroll.
+    Dictionary with keys Fs, NFFT, Ncp1, Ncp2 (scaled by osr), RB, Nsc and
+    Lroll.
     """
-    N_slot_in_subframe = 2**mu
-    SCS = 2**mu * 15e3
-
     RB = n_rb(fr, mu, bw)
     if RB < 20:
         raise ValueError(
             f"carrier of {RB} RBs at mu = {mu} cannot hold the 20 RB SS/PBCH block (TS 38.211, Section 7.4.3.1)"
         )
+    # FFT sizes, the smallest one with at least 10 % oversampling of the
+    # occupied subcarriers is used
+    fft_sizes = (128, 256, 512, 1024, 2048, 4096)
+    # Raised-cosine roll-off length per FFT size, chosen to keep EVM < 1 %
+    l_roll = {128: 4, 256: 6, 512: 4, 1024: 6, 2048: 8, 4096: 10}
 
-    NFFT = 2 ** np.ceil(np.log2(RB * 12 / 0.9))  # FFT size
-    NFFT = max(128, NFFT)
-    # NFFT=4096
-    Tc = 1 / (15e3 * 2**mu * NFFT)
-    Ts = 1 / (15e3 * 2048)
-    k = Ts / Tc
-    Fs = NFFT * SCS  # sampling frequency
-    Ncp1 = 144 * k * (1 / (2**mu)) + 16 * k  # length of cyclic prefix 0 and 7*2**mu
-    Ncp2 = 144 * k * (1 / (2**mu))  # length of cyclic prefixes else
-    Nofdm1 = NFFT + Ncp1  # length of OFDM symbol 0
-    Nofdm2 = NFFT + Ncp2  # length of OFDM symbols 1-6
+    n_sc = 12 * RB
+    scs = 15e3 * 2**mu
+    nfft = next(n for n in fft_sizes if 0.9 * n >= n_sc)
+    fs = nfft * scs
 
-    # set parameters that are not proportional to BW:
-    # - W     = EVM window length
-    # - Lroll = optimum symbol rolloff length to keep EVM < 1%
-    # - RB    = number of Resource Blocks
-    Lroll = 0
-    if NFFT == 128:
-        Lroll = 4
-    elif NFFT == 256:
-        Lroll = 6
-    elif NFFT == 512:
-        Lroll = 4
-    elif NFFT == 1024:
-        Lroll = 6
-    elif NFFT == 2048:
-        Lroll = 8
-    if Lroll == 0:
-        Lroll = max(0, 8 - 2 * (11 - (np.log2(NFFT))))
-    up = {
-        "Fs": Fs * osr,
-        "NFFT": NFFT * osr,
-        "Ncp1": Ncp1 * osr,
-        "Ncp2": Ncp2 * osr,
-        "Nofdm1": Nofdm1 * osr,
-        "Nofdm2": Nofdm2 * osr,
-        # "Nslot":Nslot*osr,
-        # "W":W*osr,
+    # Cyclic prefix lengths in samples at fs (TS 38.211, Section 5.3.1)
+    ncp = 144 * nfft / 2048
+    ncp_long = ncp + 16 * 2**mu * nfft / 2048
+
+    return {
+        "Fs": fs * osr,
+        "NFFT": nfft * osr,
+        "Ncp1": ncp_long * osr,
+        "Ncp2": ncp * osr,
         "RB": RB,
-        "Nsc": RB * 12,  # number of occupied subcarriers
-        "Lroll": Lroll,
+        "Nsc": n_sc,
+        "Lroll": l_roll[nfft],
     }
-
-    return up
