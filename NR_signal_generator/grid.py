@@ -70,3 +70,30 @@ def reference_grid(n_rb, n_symb, mu, lo, hi, n_id_cell, n_id2):
     is_ref[pss_start : pss_start + 240, pss_symbol] = True
 
     return values, is_ref
+
+
+def data_symbols(re_grid, mask):
+    """
+    Return the data symbols of a resource-element grid.
+
+    Symbols are taken by position, in column-major order: symbol by symbol,
+    ascending subcarrier within each symbol. This is the order in which the
+    generator maps data to the grid.
+
+    Parameters
+    ----------
+    re_grid : array
+        Resource-element grid of shape (Nsc, Nsymb)
+    mask : array of bool
+        Data resource elements of the grid, as returned by data_re_mask
+
+    Returns
+    -------
+    One-dimensional array of mask.sum() data symbols.
+
+    Example
+    -------
+    data_symbols(re_grid, data_re_mask(n_rb=51, n_symb=14, lo=0, hi=1))
+
+    """
+    return re_grid.T[mask.T]

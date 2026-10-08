@@ -753,20 +753,9 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
             N_ID_1 = 0  # physical-layer cell-identity group
             N_ID_2 = 0  # physical-layer identity within the group
             N_ID_cell = 3 * N_ID_1 + N_ID_2  # cell identity
-            # initialize data constellations (non-normalized)
-            DataSymbols_nnorm = np.copy(cnstl[n])
             Nsymb = int(BWP[n][1])
             mask = grid.data_re_mask(dl["RB"], Nsymb, BWP[n][2], BWP[n][3])
-            DataSymbols_nnorm[~mask] = 0
-
-            # vectorize constellations
-            DataSymbols_vect = np.reshape(
-                DataSymbols_nnorm, (DataSymbols_nnorm.size), order="F"
-            )
-
-            # keep only non-zero symbols
-
-            DataSymbols_nzero = DataSymbols_vect[np.argwhere(DataSymbols_vect)]
+            DataSymbols_nzero = grid.data_symbols(cnstl[n], mask).reshape(-1, 1)
             cnstl_of_carrier.append(DataSymbols_nzero)
             vector.append(constellation.demodulate(DataSymbols_nzero.flatten(), qam_type))
         return vector, cnstl_of_carrier
@@ -1436,24 +1425,9 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         N_ID_1 = 0  # physical-layer cell-identity group
         N_ID_2 = 0  # physical-layer identity within the group
         N_ID_cell = 3 * N_ID_1 + N_ID_2  # cell identity
-        # initialize data constellations (non-normalized)
-        rxDataSymbols_nnorm = np.copy(dem)
-        refDataSymbols_nnorm = np.copy(cnstl)
         mask = grid.data_re_mask(dl["RB"], N_symb, BWP[2], BWP[3])
-        rxDataSymbols_nnorm[~mask] = 0
-        refDataSymbols_nnorm[~mask] = 0
-
-        # vectorize constellations
-        rxDataSymbols_vect = np.reshape(
-            rxDataSymbols_nnorm, (rxDataSymbols_nnorm.size), order="F"
-        )
-        refDataSymbols_vect = np.reshape(
-            refDataSymbols_nnorm, (refDataSymbols_nnorm.size), order="F"
-        )
-
-        # keep only non-zero symbols
-        rxDataSymbols_nzero = rxDataSymbols_vect[np.argwhere(rxDataSymbols_vect)]
-        refDataSymbols_nzero = refDataSymbols_vect[np.argwhere(refDataSymbols_vect)]
+        rxDataSymbols_nzero = grid.data_symbols(dem, mask).reshape(-1, 1)
+        refDataSymbols_nzero = grid.data_symbols(cnstl, mask).reshape(-1, 1)
         # normalize constellation powers
         rxDataSymbols = self.normalize(x=rxDataSymbols_nzero, opt="pow", k=1)
         refDataSymbols = self.normalize(x=refDataSymbols_nzero, opt="pow", k=1)
