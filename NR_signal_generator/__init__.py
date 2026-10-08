@@ -826,38 +826,10 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
             RE[:start, :] = 0
             RE[stop:, :] = 0
             # RE=np.zeros((dl["Nsc"],Nsymb),complex)
-            symb_in_frame = int(2**mu * 10 * 14)
-            for i in range(0, int(np.ceil(Nsymb / symb_in_frame))):
-                if (Nsymb - i * symb_in_frame) > symb_in_frame:
-                    NsymbInGrid = symb_in_frame
-                else:
-                    NsymbInGrid = Nsymb - i * symb_in_frame
-
-                r_DMRS = sequences.dmrs(
-                    N_ID_cell, NsymbInGrid, (stop - start) / 12
-                )  # DeModulation Reference Signals
-
-                # map DMRS
-
-                k = np.arange(start, stop, 2)
-
-                for l in range(0, int(NsymbInGrid)):
-                    if l % 14 == 2:
-
-                        RE[k, i * symb_in_frame + l] = r_DMRS[:, l]
-
-            # map PSS
-            d_PSS = sequences.pss(N_ID_2)  # PRIMARY SYNCHRONIZATION SIGNAL
-            # if n==0:
-            l = (
-                min([NsymbInGrid, 4]) - 1
-            )  # if signal shorter that 4 symbols --> anticipate PSS!
-            k = np.arange(0, 240) - np.ceil(240 / 2) + dl["Nsc"] / 2
-            first = int(k[0])
-            last = int(k[-1])
-            RE[first : last + 1, i * symb_in_frame + l] = np.concatenate(
-                (np.zeros(56), d_PSS, np.zeros(57))
-            )  # set  edge subcarriers to 0
+            values, is_ref = grid.reference_grid(
+                dl["RB"], Nsymb, mu, BWP[n][2], BWP[n][3], N_ID_cell, N_ID_2
+            )
+            RE[is_ref] = values[is_ref]
 
             mask = grid.data_re_mask(dl["RB"], Nsymb, BWP[n][2], BWP[n][3])
             unusedOFDM = np.argwhere(mask.T)[:, ::-1]
@@ -1323,38 +1295,10 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
             RE_id = np.ones((RE.shape), complex)
             start = int(np.floor(dl["RB"] * BWP[n][2]) * 12)
             stop = int(np.ceil(dl["RB"] * BWP[n][3]) * 12)
-            symb_in_frame = int(2**mu * 10 * 14)
-            for i in range(0, int(np.ceil(N_symb_TOT / symb_in_frame))):
-                if (N_symb_TOT - i * symb_in_frame) > symb_in_frame:
-                    NsymbInGrid = symb_in_frame
-                else:
-                    NsymbInGrid = N_symb_TOT - i * symb_in_frame
-
-                r_DMRS = sequences.dmrs(
-                    N_ID_cell, NsymbInGrid, (stop - start) / 12
-                )  # DeModulation Reference Signals
-
-                # map DMRS
-                # v_shift=N_ID_cell%6
-
-                k = np.arange(start, stop, 2)
-
-                for l in range(0, int(NsymbInGrid)):
-                    if l % 14 == 2:
-
-                        RE_id[k, i * symb_in_frame + l] = r_DMRS[:, l]
-
-            d_PSS = sequences.pss(N_ID_2)  # PRIMARY SYNCHRONIZATION SIGNAL
-            # if n==0:
-            l = (
-                min([NsymbInGrid, 4]) - 1
-            )  # if signal shorter that 4 symbols --> anticipate PSS!
-            k = np.arange(0, 240) - np.ceil(240 / 2) + dl["Nsc"] / 2
-            first = int(k[0])
-            last = int(k[-1])
-            RE_id[first : last + 1, i * symb_in_frame + l] = np.concatenate(
-                (np.zeros(56), d_PSS, np.zeros(57))
-            )  # set  edge subcarriers to 0
+            values, is_ref = grid.reference_grid(
+                dl["RB"], N_symb_TOT, mu, BWP[n][2], BWP[n][3], N_ID_cell, N_ID_2
+            )
+            RE_id[is_ref] = values[is_ref]
 
             # calculate the complex ratios of the post-FFT acquired signal "RE" and the
             # post-FFT ideal signal "RE_id", for each reference symbol
