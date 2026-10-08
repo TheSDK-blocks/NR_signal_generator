@@ -38,6 +38,8 @@ from plot_PSD import plot_PSD
 
 from . import constellation
 from . import grid
+from . import numerology
+from . import ofdm
 from . import sequences
 
 
@@ -362,11 +364,8 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
                         LCM = np.lcm(LCM, int(up["Fs"]))
                         if BW[i] > 0:
                             sub_NFFT.append(up["NFFT"])
-                            N_ofdm1 = np.ceil(BWP[i][j][1] / (7 * 2 ** BWP[i][j][0]))
-                            slen.append(
-                                N_ofdm1 * up["Nofdm1"]
-                                + up["Nofdm2"] * (BWP[i][j][1] - N_ofdm1)
-                            )
+                            ncp = numerology.nr_cp_lengths(BWP[i][j][1], BWP[i][j][0], up)
+                            slen.append(ofdm.symbol_starts(ncp, up["NFFT"])[-1])
                         if up["Fs"] > maxsf:
                             maxsf = up["Fs"]
 
@@ -795,14 +794,8 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
             N_ID_2 = 0  # physical-layer identity within the group
             N_ID_cell = 3 * N_ID_1 + N_ID_2  # cell identity
             Nsymb = int(BWP[n][1])
-            N_slots = np.ceil(
-                Nsymb / (7 * 2**mu)
-            )  # get total number of slots to be generated (round up)
-
-            Nsym_cp2 = Nsymb - N_slots
-            Nsamples = (
-                dl["Nofdm1"] * N_slots + dl["Nofdm2"] * Nsym_cp2
-            )  # get total number of samples
+            ncp = numerology.nr_cp_lengths(Nsymb, mu, dl)
+            Nsamples = ofdm.symbol_starts(ncp, dl["NFFT"])[-1]
 
             # RE=np.copy(cnstl)
             RE = np.full((dl["Nsc"], Nsymb), None)
@@ -1161,14 +1154,12 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         for n in range(0, len(BWP)):
             mu = BWP[n][0]
             N_symb_TOT = int(BWP[n][1])
-            Nsym_cp1 = np.ceil(N_symb_TOT / (7 * 2**mu))
 
             # get various parameters related to input signal
             dl = self.NRparameters(mu=mu, BW=BW, osr=osr[n])  # general NR parameters
-            Nsym_cp2 = N_symb_TOT - Nsym_cp1
-            N_sampl = int(
-                dl["Nofdm1"] * Nsym_cp1 + dl["Nofdm2"] * Nsym_cp2
-            )  # get total number of samples
+            ncp = numerology.nr_cp_lengths(N_symb_TOT, mu, dl)
+            starts = ofdm.symbol_starts(ncp, dl["NFFT"])
+            N_sampl = int(starts[-1])
             if len(BWP) > 1:
                 sign = s[end_of_prev_sig : end_of_prev_sig + N_sampl]
                 end_of_prev_sig = end_of_prev_sig + N_sampl
@@ -1196,17 +1187,8 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
             if N_symb_TOT == 0:
                 print("ERROR")
                 return 0
-            elif N_symb_TOT == 1:
-                xcmax_id = N_sampl + dl["Ncp1"]
-            elif N_symb_TOT < 4:
-                xcmax_id = (
-                    N_sampl
-                    + dl["Nofdm1"]
-                    + (N_symb_TOT - 2) * dl["Nofdm2"]
-                    + dl["Ncp2"]
-                )
-            else:
-                xcmax_id = N_sampl + dl["Nofdm1"] + 2 * dl["Nofdm2"] + dl["Ncp2"]
+            l_pss = min(N_symb_TOT, 4) - 1
+            xcmax_id = N_sampl + starts[l_pss] + ncp[l_pss]
 
             # circularly shift input vector so that PSS location becomes "as expected"
             invect_aligned = np.roll(sign, int(xcmax_id - xcmax) - 1)
@@ -1216,44 +1198,10 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
             # invect_aligned[:]=1
             FFTw_shift_1 = -dl["Ncp1"] / 2 + FFTwpos
             FFTw_shift_2 = -1 * np.ceil(dl["Ncp2"] / 2) + FFTwpos
-            OFDMmatrix = np.zeros((int(dl["NFFT"]), int(N_symb_TOT)), complex)
-            # iterate through the OFDM symbols
-            for index in range(0, int(N_symb_TOT)):
-
-                cp1 = np.ceil(index / (7 * 2**mu))
-
-                cp2 = index - cp1
-                if index % (7 * 2**mu) == 0:
-                    i1 = (
-                        dl["Nofdm1"] * cp1
-                        + dl["Nofdm2"] * cp2
-                        + dl["Ncp1"]
-                        + FFTw_shift_1
-                        + 1
-                    )
-                    i2 = (
-                        dl["Nofdm1"] * cp1
-                        + dl["Nofdm2"] * cp2
-                        + dl["Ncp1"]
-                        + FFTw_shift_1
-                        + dl["NFFT"]
-                    )
-                else:
-                    i1 = (
-                        dl["Nofdm1"] * cp1
-                        + dl["Nofdm2"] * cp2
-                        + dl["Ncp2"]
-                        + FFTw_shift_2
-                        + 1
-                    )
-                    i2 = (
-                        dl["Nofdm1"] * cp1
-                        + dl["Nofdm2"] * cp2
-                        + dl["Ncp2"]
-                        + FFTw_shift_2
-                        + dl["NFFT"]
-                    )
-                OFDMmatrix[:, index] = invect_aligned[int(i1 - 1) : int(i2)]
+            long_cp = np.arange(N_symb_TOT) % (7 * 2**mu) == 0
+            FFTw_shift = np.where(long_cp, FFTw_shift_1, FFTw_shift_2)
+            FFTw_start = (starts[:-1] + ncp + FFTw_shift).astype(int)
+            OFDMmatrix = invect_aligned[FFTw_start[:, None] + np.arange(int(dl["NFFT"]))].T
 
             # calculate compensation factor, due to shift of FFT window from "nominal"
             # position (i.e. when CP is completely discarded)
