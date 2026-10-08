@@ -38,6 +38,7 @@ from plot_PSD import plot_PSD
 
 from . import constellation
 from . import grid
+from . import sequences
 
 
 class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
@@ -678,247 +679,6 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
 
         return up
 
-    def genPSS(self, **kwargs):
-        """Method for generation Primary Synchronization  Signal.
-
-        Parameters
-        ----------
-        id2 : integer
-            Second cell ID defined for 5G NR
-
-        Example
-        -------
-        self.genPSS(id2=0)
-
-        """
-
-        N_ID_2 = kwargs.get("id2")
-
-        # generate m-sequence
-
-        n = np.arange(0, 127)
-        m = np.mod(n + 43 * N_ID_2, 127)
-
-        # arr=[]
-        # for i in range(0,len(m)):
-        #    arr.append(self.x(i))
-        # d_PSS=1-2*np.array(arr)
-
-        d_PSS = np.array(
-            [
-                1,
-                -1,
-                -1,
-                1,
-                -1,
-                -1,
-                -1,
-                -1,
-                1,
-                1,
-                -1,
-                -1,
-                -1,
-                1,
-                1,
-                -1,
-                1,
-                -1,
-                1,
-                -1,
-                -1,
-                1,
-                1,
-                -1,
-                -1,
-                1,
-                1,
-                1,
-                1,
-                1,
-                -1,
-                -1,
-                1,
-                -1,
-                -1,
-                1,
-                -1,
-                1,
-                -1,
-                -1,
-                -1,
-                1,
-                -1,
-                1,
-                1,
-                1,
-                -1,
-                -1,
-                1,
-                1,
-                -1,
-                1,
-                1,
-                1,
-                -1,
-                1,
-                1,
-                1,
-                1,
-                1,
-                1,
-                -1,
-                1,
-                1,
-                -1,
-                1,
-                1,
-                -1,
-                -1,
-                1,
-                -1,
-                1,
-                1,
-                -1,
-                -1,
-                -1,
-                -1,
-                1,
-                -1,
-                -1,
-                -1,
-                1,
-                1,
-                1,
-                1,
-                -1,
-                -1,
-                -1,
-                -1,
-                -1,
-                -1,
-                -1,
-                1,
-                1,
-                1,
-                -1,
-                -1,
-                -1,
-                1,
-                -1,
-                -1,
-                1,
-                1,
-                1,
-                -1,
-                1,
-                -1,
-                1,
-                1,
-                -1,
-                1,
-                -1,
-                -1,
-                -1,
-                -1,
-                -1,
-                1,
-                -1,
-                1,
-                -1,
-                1,
-                -1,
-                1,
-                1,
-                1,
-                1,
-                -1,
-            ]
-        )
-        d = d_PSS[m]
-        return d
-
-    def genDMRS(self, **kwargs):
-        """Method for generation Demodulation Reference Signal
-
-        Parameters
-        ----------
-        N_ID_cell : integer
-           Cell ID
-        Nsymb : integer
-            Number of OFDM symbols
-        RB : integer
-            Number of used Resource Blocks
-
-        Example
-        -------
-        self.genDMRS(N_ID_cell=0, Nsymb=14, RB=5)
-
-        """
-
-        N_ID_cell = kwargs.get("N_ID_cell")
-        Nsymb = kwargs.get("Nsymb")
-        RB = kwargs.get("RB")
-
-        N_RB = int(RB * 12 / 2)
-        r = np.zeros((N_RB, int(Nsymb)), complex)
-        for i in range(0, int(Nsymb)):
-            # get slot number & symbol number within the slot
-            ns = np.floor(i / 14)
-            l = i % 14
-
-            c_init = np.mod(
-                (2**17 * (14 * ns + l + 1) * (2 * N_ID_cell + 1) + 2 * N_ID_cell),
-                2**31,
-            )
-            c = self.rnd3GPPGenerator(c_init=c_init, Mpn=2 * N_RB)
-            # create reference-signal sequence
-            ones = np.ones(int(len(c) / 2))
-            a = np.reshape(np.array(c), (-1, 2))
-            b = a[0, :]
-            r[:, i] = np.add(
-                (1 / (np.sqrt(2))) * np.subtract(ones, 2 * a[:, 0]),
-                1j * (1 / (np.sqrt(2))) * np.subtract(ones, 2 * a[:, 1]),
-            )
-
-        return r
-
-    def rnd3GPPGenerator(self, **kwargs):
-        """Method for calculation of pseude-random sequence for 5G NR
-
-        Parameters
-        ----------
-        c_init : integer
-            Initial value used for sequence generation
-        Mpn : integer
-            Second initial value that sets length of the sequence
-
-        Example
-        -------
-        self.calc_EVM(c_init=5,Mpn=30)
-
-        """
-
-        c_init = kwargs.get("c_init")
-        Mpn = kwargs.get("Mpn")
-
-        Nc = 1600
-        x1 = np.zeros(Mpn + Nc)
-        x2 = np.zeros(Mpn + Nc)
-        x1[0] = 1
-        c_init_bit = np.binary_repr(int(c_init), 31)
-        for i in range(0, 31):
-            x2[i] = float(c_init_bit[30 - i])
-        # calculate m-sequences x1 and x2
-        for i in range(0, Mpn + Nc - 31):
-            x1[i + 31] = (x1[i + 3] + x1[i]) % 2
-            x2[i + 31] = (x2[i + 3] + x2[i + 2] + x2[i + 1] + x2[i]) % 2
-        c = np.zeros(Mpn)
-        # calculate pseudo-random sequence
-        for n in range(0, Mpn):
-            c[n] = (x1[n + Nc] + x2[n + Nc]) % 2
-        return c
-
     def genQAM(self, **kwargs):
         """Method for generating constellation point based on input bits.
 
@@ -1073,8 +833,8 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
                 else:
                     NsymbInGrid = Nsymb - i * symb_in_frame
 
-                r_DMRS = self.genDMRS(
-                    N_ID_cell=N_ID_cell, Nsymb=NsymbInGrid, RB=(stop - start) / 12
+                r_DMRS = sequences.dmrs(
+                    N_ID_cell, NsymbInGrid, (stop - start) / 12
                 )  # DeModulation Reference Signals
 
                 # map DMRS
@@ -1087,7 +847,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
                         RE[k, i * symb_in_frame + l] = r_DMRS[:, l]
 
             # map PSS
-            d_PSS = self.genPSS(id2=N_ID_2)  # PRIMARY SYNCHRONIZATION SIGNAL
+            d_PSS = sequences.pss(N_ID_2)  # PRIMARY SYNCHRONIZATION SIGNAL
             # if n==0:
             l = (
                 min([NsymbInGrid, 4]) - 1
@@ -1461,7 +1221,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
             N_ID_2 = 0  # physical-layer identity within the group
             N_ID_cell = 3 * N_ID_1 + N_ID_2  # cell identity
             # generate PSS in the time-domain
-            d_PSS = self.genPSS(id2=N_ID_2)  # generate PSS sequence
+            d_PSS = sequences.pss(N_ID_2)  # generate PSS sequence
             # map PSS sequence to subcarriers
             PSSf = np.zeros((int(dl["NFFT"])), complex)
             PSSf[-64:] = d_PSS[0:64]
@@ -1570,8 +1330,8 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
                 else:
                     NsymbInGrid = N_symb_TOT - i * symb_in_frame
 
-                r_DMRS = self.genDMRS(
-                    N_ID_cell=N_ID_cell, Nsymb=NsymbInGrid, RB=(stop - start) / 12
+                r_DMRS = sequences.dmrs(
+                    N_ID_cell, NsymbInGrid, (stop - start) / 12
                 )  # DeModulation Reference Signals
 
                 # map DMRS
@@ -1584,7 +1344,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
 
                         RE_id[k, i * symb_in_frame + l] = r_DMRS[:, l]
 
-            d_PSS = self.genPSS(id2=N_ID_2)  # PRIMARY SYNCHRONIZATION SIGNAL
+            d_PSS = sequences.pss(N_ID_2)  # PRIMARY SYNCHRONIZATION SIGNAL
             # if n==0:
             l = (
                 min([NsymbInGrid, 4]) - 1
