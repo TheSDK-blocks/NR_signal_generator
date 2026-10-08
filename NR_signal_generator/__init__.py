@@ -32,7 +32,6 @@ from thesdk import *
 import pdb
 import numpy as np
 import scipy.signal as sig
-from scipy import interpolate as inter
 import matplotlib.pyplot as plt
 from plot_PSD import plot_PSD
 
@@ -64,6 +63,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
             "in_bits",
             "include_time_vector",
             "Fc_gen",
+            "FR",
         ]
 
         self.IOS = Bundle()
@@ -71,10 +71,11 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
 
         self.IOS.Members["out"] = IO()  # Pointer for output data
 
-        self.BWP = np.array([[[4, 7, 0, 64]]])
+        self.BWP = np.array([[[1, 7, 0, 273]]])
         self.QAM = "64QAM"
         self.osr = 1
-        self.BW = np.array([200e6])
+        self.BW = np.array([100e6])
+        self.FR = "FR1"  # frequency range, "FR1" or "FR2-1"
         self.in_bits = np.array([["max"]])
 
         self.seed = 0
@@ -514,62 +515,15 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
                 gen_bits.append([])
         return cnstl, gen_bits
 
-    def spline_inter(self, **kwargs):
-        """Method for calculating spline interpolation for resource block sizeing.
-
-        Parameters
-        ----------
-        mu : integer (0,1,2,3,4)
-           5G NR numerology
-        BW : integer
-            Bandwidth of carrier.
-
-        Example
-        -------
-        self.spline_inter(mu=1,BW=10e6)
-
-        """
-
-        mu = kwargs.get("mu")
-        BW = kwargs.get("BW")
-
-        if mu == 0:  # Numbers of RB from standard 38.101
-            x = [0, 5e6, 10e6, 15e6, 20e6, 25e6, 40e6, 50e6]
-            y = [0, 25, 52, 79, 106, 133, 216, 270]
-        elif mu == 1:
-            x = [0, 5e6, 10e6, 15e6, 20e6, 25e6, 40e6, 50e6, 60e6, 80e6, 100e6]
-            y = [0, 11, 24, 38, 51, 65, 106, 133, 162, 217, 273]
-        elif mu == 2:
-            x = [0, 10e6, 15e6, 20e6, 25e6, 40e6, 50e6, 60e6, 80e6, 100e6, 200e6]
-            y = [0, 11, 18, 24, 31, 51, 65, 79, 107, 135, 264]
-        elif mu == 3:
-            x = [0, 50e6, 100e6, 200e6, 400e6]
-            y = [0, 32, 66, 132, 264]
-        elif mu == 4:
-            x = [0, 100e6, 200e6, 400e6]
-            y = [0, 32, 64, 128]
-
-        if mu == 4:
-            p = inter.interp1d(x, y)
-        else:
-            p = inter.interp1d(x, y, kind="cubic")
-
-        try:
-            RB = int(np.floor(p(BW)))
-        except:
-            raise Exception("Width of selected BWP is too big for selected mu")
-
-        return RB
-
     def NRparameters(self, **kwargs):
         """Method for calculating necessary parameters
 
         Parameters
         ----------
-        mu : integer (0,1,2,3,4)
+        mu : integer (0,1,2,3)
            5G NR numerology
         BW : integer
-            Bandwidth of carrier
+            Bandwidth of carrier, a channel bandwidth of self.FR
         osr : integer
             Oversampling factor
 
@@ -587,7 +541,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
 
         min_BW = 20 * SCS * 12
 
-        RB = self.spline_inter(mu=mu, BW=BW)
+        RB = numerology.n_rb(self.FR, mu, BW)
         if gen == 1:
             self.BW_conf.append(RB * 12 * SCS)
         temp1 = [

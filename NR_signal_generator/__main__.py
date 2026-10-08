@@ -1,3 +1,4 @@
+import pdb
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -10,7 +11,7 @@ from . import NR_signal_generator
 # method="single"
 # BWP=np.array([[[0,14,0,1],[0,14,0,1]],[[0,14,0,1],[1,14,0,1],[2,14,0,1]]])  #[mu, symbols, BW_low(0...1),BW_high(0...1)>BW_low]
 # BWP=np.array([[[4,7,0,1]],[[4,7,0,1]]])
-BWP = np.array([[[4, 7, 0, 1]]])
+BWP = np.array([[[4, 8, 0, 48]]])
 # BW=np.array([400e6,400e6])
 BW = np.array([150e6])
 # mu=[0,0]
@@ -84,5 +85,5 @@ a = plot_PSD(
     # 100,
     Fs=test.s_struct["Fs"]
 )
-print("tst")
-input()
+
+pdb.set_trace()
