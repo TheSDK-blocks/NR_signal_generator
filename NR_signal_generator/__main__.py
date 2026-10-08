@@ -9,9 +9,8 @@ from . import NR_signal_generator
 # length=1024
 # method="multi"
 # method="single"
-# BWP=np.array([[[0,14,0,1],[0,14,0,1]],[[0,14,0,1],[1,14,0,1],[2,14,0,1]]])  #[mu, symbols, BW_low(0...1),BW_high(0...1)>BW_low]
-# BWP=np.array([[[4,7,0,1]],[[4,7,0,1]]])
-BWP = np.array([[[1, 7, 0, 273]]])
+# BWP=np.array([[1,7,0,273],[1,7,0,273]])  # [mu, symbols, N_BWP^start, N_BWP^size] per carrier
+BWP = np.array([[1, 7, 0, 273]])
 # BW=np.array([400e6,400e6])
 BW = np.array([100e6])
 # mu=[0,0]
@@ -30,9 +29,9 @@ QAM = "64QAM"
 # bits3=np.random.randint(2,size=3738*6)
 # bits=np.random.randint(2,size=1710*4)
 # in_bits=[bits]*len(BW)
-# in_bits =np.array([[bits2]])
-in_bits = np.array([["max"]])
-# in_bits=np.array([["max"],['max']])
+# in_bits =np.array([bits2])
+in_bits = np.array(["max"])
+# in_bits=np.array(["max", "max"])
 osr = 1
 Fc = 0  # 1e9
 if not hasattr(BW, "__len__"):
@@ -66,18 +65,12 @@ elif hasattr(BW, "__len__"):
     plt.show(block=False)
     print(test.EVM)
     for i in range(0, BW.size):
-        for j in range(0, len(BWP[i])):
-            if test.EVM[i].any():
-                if test.EVM[i][j] != 0:
-                    plt.figure()
-                    plt.plot(
-                        test.rxDataSymbols[i][j].real,
-                        test.rxDataSymbols[i][j].imag,
-                        "o",
-                    )
-                    plt.plot(test.cnstl[i][j].real, test.cnstl[i][j].imag, "o")
-                    plt.title("Carrier " + str(i + 1) + ", frame " + str(j + 1))
-                    plt.show(block=False)
+        if np.size(test.EVM[i]) and test.EVM[i] != 0:
+            plt.figure()
+            plt.plot(test.rxDataSymbols[i].real, test.rxDataSymbols[i].imag, "o")
+            plt.plot(test.cnstl[i].real, test.cnstl[i].imag, "o")
+            plt.title("Carrier " + str(i + 1))
+            plt.show(block=False)
 
 # meas(test,test.s_struct["Fs"])
 a = plot_PSD(

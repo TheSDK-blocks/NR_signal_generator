@@ -71,12 +71,12 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
 
         self.IOS.Members["out"] = IO()  # Pointer for output data
 
-        self.BWP = np.array([[[1, 7, 0, 273]]])
+        self.BWP = np.array([[1, 7, 0, 273]])
         self.QAM = "64QAM"
         self.osr = 1
         self.BW = np.array([100e6])
         self.FR = "FR1"  # frequency range, "FR1" or "FR2-1"
-        self.in_bits = np.array([["max"]])
+        self.in_bits = np.array(["max"])
 
         self.seed = 0
         self.include_time_vector = 0
@@ -197,7 +197,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         bits = []
         dem_cnstl_vec = []
         for i in range(0, len(dem)):
-            if NR_car_id == -1 or i == NR_car_id:
+            if BW[i] > 0 and (NR_car_id == -1 or i == NR_car_id):
                 temp1, temp2 = self.QAMtoBit(cnstl=dem[i], BW=BW[i], BWP=BWP[i])
                 bits.append(temp1)
                 dem_cnstl_vec.append(temp2)
@@ -228,22 +228,12 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         rxDataSymbols = []
         # measure EVM separately for each constellation
         for i in range(0, N_BW):
-            if NR_car_id == -1 or i == NR_car_id:
-                N_BWP = len(cnstl[i])
-                EVM_BWP = np.zeros(N_BWP)
-                rxDataSymbols_BWP = []
-                for j in range(0, N_BWP):
-                    if not cnstl[i][j].size == 0:
-                        EVM1, rxDataSymbols1 = self.measEVMdownlink(
-                            BW=BW[i], BWP=BWP[i][j], cnstl=cnstl[i][j], dem=dem[i][j]
-                        )
-                        EVM_BWP[j] = EVM1
-                        rxDataSymbols_BWP.append(rxDataSymbols1)
-
-                    else:
-                        rxDataSymbols_BWP.append([])
-                rxDataSymbols.append(rxDataSymbols_BWP)
-                EVM.append(EVM_BWP)
+            if BW[i] > 0 and (NR_car_id == -1 or i == NR_car_id):
+                EVM1, rxDataSymbols1 = self.measEVMdownlink(
+                    BW=BW[i], BWP=BWP[i], cnstl=cnstl[i], dem=dem[i]
+                )
+                rxDataSymbols.append(rxDataSymbols1)
+                EVM.append(EVM1)
             else:
                 rxDataSymbols.append(np.array([]))
                 EVM.append(np.array([]))
@@ -288,18 +278,13 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
                 else:
                     carrier_offset = self.Fc_gen + f_off[i] + sig_offset
                     v_mixed = s * np.exp(-1j * 2 * np.pi * carrier_offset * t)
-                osr = []
                 # calculate OSR of current carrier
-                for j in range(0, len(BWP[i])):
-                    dl_osrl = self.NRparameters(mu=BWP[i][j][0], BW=BW[i])
-                    osr.append(dl_osrl["Fs"])
-                osr = np.around(Fs / np.array(osr))
+                dl_osrl = self.NRparameters(mu=BWP[i][0], BW=BW[i])
+                osr = np.around(Fs / dl_osrl["Fs"])
 
                 v_filt = v_mixed
                 if self.fil == "on":
-                    v_filt = self.NRfilter(
-                        Fs=Fs, raw_vector=v_mixed, BW=BWi, osr=max(osr)
-                    )
+                    v_filt = self.NRfilter(Fs=Fs, raw_vector=v_mixed, BW=BWi, osr=osr)
 
                 if car_return == True:
                     t2 = (
@@ -308,17 +293,6 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
                     v_filt = v_filt * np.exp(+1j * 2 * np.pi * carrier_offset * t2)
 
                 a = self.demNRdownlink(s=v_filt, BW=BWi, BWP=BWP[i], osr=osr)
-
-                """
-                osr=[]
-                # calculate OSR of current carrier
-                for j in range(0,len(BWP[i])):
-                    dl_osrl=self.NRparameters(mu=BWP[i][j][0],BW=BW[i])
-                    osr.append(dl_osrl["Fs"])
-                osr=np.around(Fs/np.array(osr))
-                
-                a=self.demNRdownlink(s=s,BW=BWi,BWP=BWP[i],osr=osr)
-                """
                 cnstl.append(a)
             else:
                 cnstl.append(np.array([]))
@@ -348,108 +322,52 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         # get also their LCM (least common multiple)
         BW_vect_abs = np.abs(BW)
         maxsf = 0
-        slength = []
+        slength = np.zeros(N_BW)
         for i in range(0, N_BW):
-            sub_NFFT = []
-            slen = []
-            sub_fs = []
             if BW[i] != 0:
-
-                if hasattr(BWP[i], "__len__"):
-                    for j in range(0, len(BWP[i])):
-                        up = self.NRparameters(mu=BWP[i][j][0], BW=BW_vect_abs[i])
-
-                        sub_fs.append(up["Fs"])
-                        LCM = np.lcm(LCM, int(up["Fs"]))
-                        if BW[i] > 0:
-                            sub_NFFT.append(up["NFFT"])
-                            ncp = numerology.nr_cp_lengths(BWP[i][j][1], BWP[i][j][0], up)
-                            slen.append(ofdm.symbol_starts(ncp, up["NFFT"])[-1])
-                        if up["Fs"] > maxsf:
-                            maxsf = up["Fs"]
-
-                else:
-
-                    BW_of_BWP = BW[i]
-                    up2 = self.NRparameters(mu=mu[i], BW=BW_of_BWP)
-                    NFFT.append(up2["NFFT"])
-                    LCM = np.lcm(LCM, int(up2["NFFT"]))
-                    if up2["Fs"] > maxsf:
-                        maxsf = up2["Fs"]
+                up = self.NRparameters(mu=BWP[i][0], BW=BW_vect_abs[i])
+                Fss.append(up["Fs"])
+                LCM = np.lcm(LCM, int(up["Fs"]))
+                if BW[i] > 0:
+                    NFFT.append(up["NFFT"])
+                    ncp = numerology.nr_cp_lengths(BWP[i][1], BWP[i][0], up)
+                    slength[i] = ofdm.symbol_starts(ncp, up["NFFT"])[-1]
+                if up["Fs"] > maxsf:
+                    maxsf = up["Fs"]
             else:
-                sub_fs.append(0)
-            NFFT.append(sub_NFFT)
-            Fss.append(sub_fs)
-            slength.append(slen)
+                Fss.append(0)
 
         # get integer proportional to overall sampling rate
         self.NFFT_debug = max(NFFT)
-        NFFT_tot_min = 0
-
-        a = np.array_split(Fss, len(Fss))
-        a = np.concatenate(a, axis=0)
-        for i in range(0, len(Fss)):
-            NFFT_tot_min += max(a[i])
-
-        NFFT_tot = tot_osr * LCM * np.ceil(NFFT_tot_min / LCM)
+        Fss = np.array(Fss)
+        NFFT_tot = tot_osr * LCM * np.ceil(Fss.sum() / LCM)
         # calculate individual oversampling ratios
+        osr = NFFT_tot / Fss[Fss != 0]
 
-        Fss = np.concatenate(a, axis=0)
-        Fss = Fss[Fss != 0]
-        osr = NFFT_tot * np.ones_like(Fss) / Fss
-        max_len = []
-
-        ind = 0
-        for i in range(0, N_BW):
-            if BW[i] > 0:
-                sub_len = []
-                for j in range(0, len(BWP[i])):
-                    sub_len.append(osr[ind] * slength[i][j])
-                    ind += 1
-                max_len.append(sum(sub_len))
-            else:
-                ind += 1
-
-        max_len = max(max_len)
-        slength = max_len
+        slength = max(osr[i] * slength[i] for i in range(0, N_BW) if BW[i] > 0)
         Fs = maxsf * min(osr)
         smatrix = np.zeros((int(slength + self.fil_len * max(osr)), int(N_BW)), complex)
         cnstlmatrix = []
         # generate carriers
-        osr_ind = 0
         for i in range(0, N_BW):
             BWi = BW[i]
             if BWi > 0:
-                sub_cnstlmatrix = []
-                sub_smatrix = np.zeros((int(slength), 1), complex)
-                out = self.genNRdownlink(
-                    BW=BWi,
-                    BWP=BWP[i],
-                    osr=osr[osr_ind : int(osr_ind + len(BWP[i]))],
-                    cnstl=cnstl[i],
-                )
+                out = self.genNRdownlink(BW=BWi, BWP=BWP[i], osr=osr[i], cnstl=cnstl[i])
                 cnstlmatrix.append(out["cnstl"])
 
-                s = np.concatenate(out["s"])
+                s = out["s"]
                 self.testvar = s
                 if self.fil == "on":
                     s = np.pad(s, (0, (int(slength) - len(s))), constant_values=0)
-                    s = self.NRfilter(
-                        Fs=Fs,
-                        raw_vector=s,
-                        BW=BWi,
-                        osr=max(osr[osr_ind : int(osr_ind + len(BWP[i]))]),
-                    )
+                    s = self.NRfilter(Fs=Fs, raw_vector=s, BW=BWi, osr=osr[i])
                 if len(s) > len(smatrix):
                     zeros_matrix = np.zeros(
                         (len(s) - len(smatrix), np.shape(smatrix)[1])
                     )
                     smatrix = np.vstack([smatrix, zeros_matrix])
                 smatrix[0 : len(s), i] = self.normalize(x=s, opt="max", k=1)
-                osr_ind = int(osr_ind + len(BWP[i]))
             else:
                 cnstlmatrix.append([])
-                osr_ind = int(osr_ind + len(BWP[i]))
 
         s_raw = np.zeros(int(slength + self.fil_len), complex)
         BWtot = np.sum(BW_vect_abs)  # get total bandwidth (in Hz)
@@ -499,17 +417,9 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         for i in range(0, N_BW):
             BWi = BW[i]
             if BWi > 0:
-                sub_cnstl = []
-                sub_bits = []
-                b = np.size(bits[i], 0)
-                for j in range(0, b):
-                    a, bit = self.genQAM(
-                        carrier_id=i, bits=bits[i][j], BW=BW[i], BWP=BWP[i][j]
-                    )
-                    sub_cnstl.append(a)
-                    sub_bits.append(bit)
-                cnstl.append(sub_cnstl)
-                gen_bits.append(sub_bits)
+                a, bit = self.genQAM(carrier_id=i, bits=bits[i], BW=BW[i], BWP=BWP[i])
+                cnstl.append(a)
+                gen_bits.append(bit)
             else:
                 cnstl.append([])
                 gen_bits.append([])
@@ -668,25 +578,17 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         BWP = kwargs.get("BWP")
 
         qam_type = self.QAM
-        cnstl_of_carrier = []
-        vector = []
 
-        for n in range(0, len(cnstl)):
-            if cnstl == []:
-                cnstl_of_carrier.append([])
-                vector.append([])
-
-            mu = BWP[n][0]
-            dl = self.NRparameters(mu=mu, BW=BW)  # get NR parameters
-            N_ID_1 = 0  # physical-layer cell-identity group
-            N_ID_2 = 0  # physical-layer identity within the group
-            N_ID_cell = 3 * N_ID_1 + N_ID_2  # cell identity
-            Nsymb = int(BWP[n][1])
-            mask = grid.data_re_mask(dl["RB"], Nsymb, BWP[n][2], BWP[n][3])
-            DataSymbols_nzero = grid.data_symbols(cnstl[n], mask).reshape(-1, 1)
-            cnstl_of_carrier.append(DataSymbols_nzero)
-            vector.append(constellation.demodulate(DataSymbols_nzero.flatten(), qam_type))
-        return vector, cnstl_of_carrier
+        mu = BWP[0]
+        dl = self.NRparameters(mu=mu, BW=BW)  # get NR parameters
+        N_ID_1 = 0  # physical-layer cell-identity group
+        N_ID_2 = 0  # physical-layer identity within the group
+        N_ID_cell = 3 * N_ID_1 + N_ID_2  # cell identity
+        Nsymb = int(BWP[1])
+        mask = grid.data_re_mask(dl["RB"], Nsymb, BWP[2], BWP[3])
+        DataSymbols_nzero = grid.data_symbols(cnstl, mask).reshape(-1, 1)
+        vector = constellation.demodulate(DataSymbols_nzero.flatten(), qam_type)
+        return vector, DataSymbols_nzero
 
     def genNRdownlink(self, **kwargs):
         """Method for generating 5G NR signal based on constellation points.
@@ -715,48 +617,42 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         osr = kwargs.get("osr")
         cnstl = kwargs.get("cnstl")
 
-        signal = []
-        REs = []
-        for n in range(0, len(BWP)):
-            mu = BWP[n][0]
-            dl = self.NRparameters(mu=mu, BW=BW, osr=osr[n], gen=1)
-            N_ID_1 = 0  # physical-layer cell-identity group
-            N_ID_2 = 0  # physical-layer identity within the group
-            N_ID_cell = 3 * N_ID_1 + N_ID_2  # cell identity
-            Nsymb = int(BWP[n][1])
-            ncp = numerology.nr_cp_lengths(Nsymb, mu, dl)
+        mu = BWP[0]
+        dl = self.NRparameters(mu=mu, BW=BW, osr=osr, gen=1)
+        N_ID_1 = 0  # physical-layer cell-identity group
+        N_ID_2 = 0  # physical-layer identity within the group
+        N_ID_cell = 3 * N_ID_1 + N_ID_2  # cell identity
+        Nsymb = int(BWP[1])
+        ncp = numerology.nr_cp_lengths(Nsymb, mu, dl)
 
-            # RE=np.copy(cnstl)
-            RE = np.full((dl["Nsc"], Nsymb), None)
-            start = 12 * int(BWP[n][2])
-            stop = 12 * int(BWP[n][2] + BWP[n][3])
-            RE[:start, :] = 0
-            RE[stop:, :] = 0
-            # RE=np.zeros((dl["Nsc"],Nsymb),complex)
-            values, is_ref = grid.reference_grid(
-                dl["RB"], Nsymb, mu, BWP[n][2], BWP[n][3], N_ID_cell, N_ID_2
-            )
-            RE[is_ref] = values[is_ref]
+        # RE=np.copy(cnstl)
+        RE = np.full((dl["Nsc"], Nsymb), None)
+        start = 12 * int(BWP[2])
+        stop = 12 * int(BWP[2] + BWP[3])
+        RE[:start, :] = 0
+        RE[stop:, :] = 0
+        # RE=np.zeros((dl["Nsc"],Nsymb),complex)
+        values, is_ref = grid.reference_grid(
+            dl["RB"], Nsymb, mu, BWP[2], BWP[3], N_ID_cell, N_ID_2
+        )
+        RE[is_ref] = values[is_ref]
 
-            mask = grid.data_re_mask(dl["RB"], Nsymb, BWP[n][2], BWP[n][3])
-            unusedOFDM = np.argwhere(mask.T)[:, ::-1]
+        mask = grid.data_re_mask(dl["RB"], Nsymb, BWP[2], BWP[3])
+        unusedOFDM = np.argwhere(mask.T)[:, ::-1]
 
-            if len(cnstl[n]) > len(unusedOFDM):
-                raise Exception("Not enough OFDM symbols")
+        if len(cnstl) > len(unusedOFDM):
+            raise Exception("Not enough OFDM symbols")
 
-            for i in range(0, len(cnstl[n])):
-                l = unusedOFDM[i][1]
-                k = unusedOFDM[i][0]
-                RE[k, l] = cnstl[n][i]
+        for i in range(0, len(cnstl)):
+            l = unusedOFDM[i][1]
+            k = unusedOFDM[i][0]
+            RE[k, l] = cnstl[i]
 
-            RE[RE == None] = 0 + 0 * 1j
-            RE = RE.astype(complex)
+        RE[RE == None] = 0 + 0 * 1j
+        RE = RE.astype(complex)
 
-            s = ofdm.modulate(RE, dl["NFFT"], ncp, dl["Lroll"] * osr[n])
-
-            signal.append(s)
-            REs.append(RE)
-        out = {"s": signal, "cnstl": REs, "Fs": dl["Fs"]}
+        s = ofdm.modulate(RE, dl["NFFT"], ncp, dl["Lroll"] * osr)
+        out = {"s": s, "cnstl": RE, "Fs": dl["Fs"]}
 
         return out
 
@@ -995,58 +891,44 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         BWP = kwargs.get("BWP")
         osr = kwargs.get("osr")
 
-        end_of_prev_sig = 0
         equalize = self.equalizer
-        cnstl_of_carrier = []
         # if self.fil=="on":
 
         #    #sign=self.NRfilter(sign,BW,osr)
-        for n in range(0, len(BWP)):
-            mu = BWP[n][0]
-            N_symb_TOT = int(BWP[n][1])
+        mu = BWP[0]
+        N_symb_TOT = int(BWP[1])
 
-            # get various parameters related to input signal
-            dl = self.NRparameters(mu=mu, BW=BW, osr=osr[n])  # general NR parameters
-            ncp = numerology.nr_cp_lengths(N_symb_TOT, mu, dl)
-            starts = ofdm.symbol_starts(ncp, dl["NFFT"])
-            N_sampl = int(starts[-1])
-            if len(BWP) > 1:
-                sign = s[end_of_prev_sig : end_of_prev_sig + N_sampl]
-                end_of_prev_sig = end_of_prev_sig + N_sampl
-            else:
-                sign = s
-                N_sampl = len(s)
-            # if self.fil=="on":
-            #    sign=self.NRfilter(mu,sign,BW,osr[n])
-            N_slots = np.floor(N_symb_TOT / 14)  # number of slots (integer)
-            N_ID_1 = 0  # physical-layer cell-identity group
-            N_ID_2 = 0  # physical-layer identity within the group
-            N_ID_cell = 3 * N_ID_1 + N_ID_2  # cell identity
-            if N_symb_TOT == 0:
-                print("ERROR")
-                return 0
-            l_pss = grid.pss_symbol(N_symb_TOT)
-            invect_aligned = sync.pss_align(sign, dl["NFFT"], starts[l_pss] + ncp[l_pss], N_ID_2)
+        # get various parameters related to input signal
+        dl = self.NRparameters(mu=mu, BW=BW, osr=osr)  # general NR parameters
+        ncp = numerology.nr_cp_lengths(N_symb_TOT, mu, dl)
+        starts = ofdm.symbol_starts(ncp, dl["NFFT"])
+        sign = s
+        N_sampl = len(s)
+        # if self.fil=="on":
+        #    sign=self.NRfilter(mu,sign,BW,osr)
+        N_slots = np.floor(N_symb_TOT / 14)  # number of slots (integer)
+        N_ID_1 = 0  # physical-layer cell-identity group
+        N_ID_2 = 0  # physical-layer identity within the group
+        N_ID_cell = 3 * N_ID_1 + N_ID_2  # cell identity
+        if N_symb_TOT == 0:
+            print("ERROR")
+            return 0
+        l_pss = grid.pss_symbol(N_symb_TOT)
+        invect_aligned = sync.pss_align(sign, dl["NFFT"], starts[l_pss] + ncp[l_pss], N_ID_2)
 
-            RE = ofdm.demodulate(invect_aligned, dl["NFFT"], ncp, dl["Nsc"])
-            # if equalization is deactivated, return at this point already
-            if equalize == "off":
-                cnstl = RE
-                cnstl_of_carrier.append(cnstl)
-                continue
-            # re-create DMRS/PSS grid (i.e. post-FFT ideal reference signal)
-            RE_id = np.ones((RE.shape), complex)
-            values, is_ref = grid.reference_grid(
-                dl["RB"], N_symb_TOT, mu, BWP[n][2], BWP[n][3], N_ID_cell, N_ID_2
-            )
-            RE_id[is_ref] = values[is_ref]
-            pilots = grid.dmrs_mask(dl["RB"], N_symb_TOT, BWP[n][2], BWP[n][3])
+        RE = ofdm.demodulate(invect_aligned, dl["NFFT"], ncp, dl["Nsc"])
+        # if equalization is deactivated, return at this point already
+        if equalize == "off":
+            return RE
+        # re-create DMRS/PSS grid (i.e. post-FFT ideal reference signal)
+        RE_id = np.ones((RE.shape), complex)
+        values, is_ref = grid.reference_grid(
+            dl["RB"], N_symb_TOT, mu, BWP[2], BWP[3], N_ID_cell, N_ID_2
+        )
+        RE_id[is_ref] = values[is_ref]
+        pilots = grid.dmrs_mask(dl["RB"], N_symb_TOT, BWP[2], BWP[3])
 
-            cnstl = equalizer.equalize(RE, RE_id, pilots)
-
-            cnstl_of_carrier.append(cnstl)
-
-        return cnstl_of_carrier
+        return equalizer.equalize(RE, RE_id, pilots)
 
     def measEVMdownlink(self, **kwargs):
         """Method for calculation EVM.
