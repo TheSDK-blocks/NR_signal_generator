@@ -801,10 +801,6 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
             RE = np.full((dl["Nsc"], Nsymb), None)
             start = 12 * int(BWP[n][2])
             stop = 12 * int(BWP[n][2] + BWP[n][3])
-            BW_of_BWP = (stop - start) * (15e3 * 2**mu)
-            dl2 = self.NRparameters(
-                mu=mu, BW=BW_of_BWP, osr=osr[n]
-            )  # To check if BWP is more than 20 RB
             RE[:start, :] = 0
             RE[stop:, :] = 0
             # RE=np.zeros((dl["Nsc"],Nsymb),complex)

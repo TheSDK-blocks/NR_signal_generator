@@ -37,8 +37,8 @@ def dmrs_mask(n_rb, n_symb, bwp_start, bwp_size):
     """
     Return the DMRS resource elements of a BWP grid.
 
-    DMRS occupy the even subcarriers of the BWP, counted from its first
-    subcarrier 12 * bwp_start, in symbols l with l mod 14 = DMRS_SYMBOL.
+    DMRS occupy the even subcarriers of the BWP, counted from point A, the
+    lowest subcarrier of the carrier, in symbols l with l mod 14 = DMRS_SYMBOL.
 
     Parameters
     ----------
@@ -90,9 +90,8 @@ def data_re_mask(n_rb, n_symb, bwp_start, bwp_size):
         - DMRS: even subcarriers of the BWP in symbols l with l mod 14 = 2
         - PSS block: 240 subcarriers centred in the carrier, symbol pss_symbol(n_symb)
 
-    This is a simplified NR-like layout, not TS 38.211 compliant:
-    the SS/PBCH block occupies a single symbol (no SSS or PBCH), and the
-    DMRS comb is referenced to the BWP start instead of point A.
+    This is a simplified NR-like layout, not TS 38.211 compliant: the SS/PBCH
+    block occupies a single symbol (no SSS or PBCH).
     """
     n_sc = 12 * n_rb
     mask = np.zeros((n_sc, n_symb), dtype=bool)
@@ -113,8 +112,10 @@ def reference_grid(n_rb, n_symb, mu, bwp_start, bwp_size, n_id_cell, n_id2):
     values: complex array of shape (12 * n_rb, n_symb), reference values at is_ref.
     is_ref: boolean array of shape (12 * n_rb, n_symb), True for reference REs.
 
-    DMRS: even subcarriers of the BWP in symbols l with l mod 14 = 2; the
-    sequence restarts every frame of 140 * 2^mu symbols.
+    DMRS: dmrs_mask, with the sequence r(m) counted from point A, the lowest
+    subcarrier of the carrier, so that a BWP starting at RB bwp_start carries
+    r(6 bwp_start) onwards; the sequence restarts every frame of 140 * 2^mu
+    symbols.
     PSS: 240 subcarriers centred in the carrier, [0]*56 + d_PSS + [0]*57,
     in symbol pss_symbol(n_symb).
 
@@ -134,8 +135,8 @@ def reference_grid(n_rb, n_symb, mu, bwp_start, bwp_size, n_id_cell, n_id2):
         l_frame = l[(l >= frame_start) & (l < frame_start + n)]
         if l_frame.size == 0:
             continue
-        r_dmrs = sequences.dmrs(n_id_cell, n, len(k) / 6)
-        values[np.ix_(k, l_frame)] = r_dmrs[:, l_frame - frame_start]
+        r_dmrs = sequences.dmrs(n_id_cell, n, int(bwp_start + bwp_size))
+        values[np.ix_(k, l_frame)] = r_dmrs[6 * int(bwp_start) :, l_frame - frame_start]
 
     l_pss = pss_symbol(n_symb)
     pss_start = n_sc // 2 - 120
