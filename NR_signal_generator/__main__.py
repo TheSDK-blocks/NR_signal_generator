@@ -79,6 +79,10 @@ elif hasattr(BW, "__len__"):
                     plt.show(block=False)
 
 # meas(test,test.s_struct["Fs"])
-a = plot_PSD(test, 100, test.s_struct["Fs"])
+a = plot_PSD(
+    signal=test.s_struct["s"][:, 1],
+    # 100,
+    Fs=test.s_struct["Fs"]
+)
 print("tst")
 input()
