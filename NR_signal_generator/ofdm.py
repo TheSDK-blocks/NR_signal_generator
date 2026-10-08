@@ -32,12 +32,14 @@ def modulate(grid, nfft, ncp, n_roll):
     Return the cyclic, windowed OFDM time signal of a resource-element grid.
 
     Each symbol is the IFFT of its subcarriers, extended by its cyclic
-    prefix and tapered with a raised-cosine window of n_roll samples on
-    each side. The tapers of neighbouring symbols overlap and add
-    (weighted overlap-add). The signal is cyclic: the taper of the last
-    symbol wraps to the start and that of the first symbol to the end.
+    prefix and a cyclic suffix of n_roll samples, and tapered with
+    complementary raised-cosine edges of n_roll samples (weighted
+    overlap-add). The fall of each symbol overlaps the rise of the next
+    over the first n_roll samples of its cyclic prefix, where the two
+    weights sum to one. The signal is cyclic: the suffix of the last symbol
+    wraps to the start. n_roll = 0 gives plain CP-OFDM.
 
-        x(T_i + r) += w_i(r) X_i((r - ncp_i) mod nfft),  -n_roll <= r < ncp_i + nfft + n_roll - 1
+        x(T_i + r) += w_i(r) X_i((r - ncp_i) mod nfft),  0 <= r < ncp_i + nfft + n_roll
 
     where X_i is the IFFT of symbol i and T_i its start from symbol_starts.
 
@@ -51,7 +53,7 @@ def modulate(grid, nfft, ncp, n_roll):
     ncp : array
         Cyclic prefix length of each OFDM symbol in samples
     n_roll : integer
-        Raised-cosine taper length in samples
+        Raised-cosine overlap length in samples, at most min(ncp)
 
     Returns
     -------
@@ -71,14 +73,13 @@ def modulate(grid, nfft, ncp, n_roll):
     padded = np.pad(grid, ((pad_lo, nfft - n_sc - pad_lo), (0, 0)))
     symbols = np.fft.ifft(np.fft.ifftshift(padded, axes=0), axis=0)
 
-    rise = 0.5 * (1 + np.cos(np.pi * np.arange(n_roll + 1, 2 * n_roll + 1) / n_roll))
-    fade = 0.5 * (1 + np.cos(np.pi * np.arange(0, n_roll) / n_roll))
+    rise = 0.5 * (1 - np.cos(np.pi * (np.arange(n_roll) + 0.5) / n_roll))
 
     starts = symbol_starts(ncp, nfft)
     x = np.zeros(starts[-1], complex)
     for i in range(n_symb):
-        window = np.concatenate((rise, np.ones(ncp[i] + nfft - 1), fade))
-        r = np.arange(-n_roll, ncp[i] + nfft + n_roll - 1)
+        window = np.concatenate((rise, np.ones(ncp[i] + nfft - n_roll), rise[::-1]))
+        r = np.arange(ncp[i] + nfft + n_roll)
         segment = symbols[(r - ncp[i]) % nfft, i] * window
         np.add.at(x, (starts[i] + r) % starts[-1], segment)
     return x
