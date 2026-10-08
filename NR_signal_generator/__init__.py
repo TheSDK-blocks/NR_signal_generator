@@ -41,6 +41,7 @@ from . import grid
 from . import numerology
 from . import ofdm
 from . import sequences
+from . import sync
 
 
 class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
@@ -1095,26 +1096,11 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
             N_ID_1 = 0  # physical-layer cell-identity group
             N_ID_2 = 0  # physical-layer identity within the group
             N_ID_cell = 3 * N_ID_1 + N_ID_2  # cell identity
-            # generate PSS in the time-domain
-            d_PSS = sequences.pss(N_ID_2)  # generate PSS sequence
-            # map PSS sequence to subcarriers
-            PSSf = np.zeros((int(dl["NFFT"])), complex)
-            PSSf[-64:] = d_PSS[0:64]
-            PSSf[1:64] = d_PSS[64:127]
-            PSSt = np.fft.ifft(PSSf)  # convert to time-domain
-            # find match of PSS within the input vector, by computing cross-correlation
-            # and looking for its maximum
-            pad = np.pad(PSSt, (0, len(sign) - len(PSSt)), constant_values=0)
-            xcmax = np.argmax(np.absolute(np.correlate(sign, pad, "full")))
-            # calculate ideal result of the cross-correlation maximum (see above)
             if N_symb_TOT == 0:
                 print("ERROR")
                 return 0
             l_pss = min(N_symb_TOT, 4) - 1
-            xcmax_id = N_sampl + starts[l_pss] + ncp[l_pss]
-
-            # circularly shift input vector so that PSS location becomes "as expected"
-            invect_aligned = np.roll(sign, int(xcmax_id - xcmax) - 1)
+            invect_aligned = sync.pss_align(sign, dl["NFFT"], starts[l_pss] + ncp[l_pss], N_ID_2)
 
             RE = ofdm.demodulate(invect_aligned, dl["NFFT"], ncp, dl["Nsc"])
             # if equalization is deactivated, return at this point already
