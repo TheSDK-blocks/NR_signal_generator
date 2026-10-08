@@ -972,12 +972,12 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         Ncnstl = len(unusedOFDM)
 
         if bits == "max":
-            seed = (carrier_id + signal_id * 13 + 1) * 123
+            seed = (carrier_id + self.signal_id * 13 + 1) * 123
             rng = np.random.RandomState(seed)
-            bits = rng.randint(2, size=capacity)
-            # TODO: replace capacity with bits_per_symbol * Ncnstl
+            bits = rng.randint(2, size=constellation.BITS_PER_SYMBOL[self.QAM] * Ncnstl)
 
-        return constellation.modulate(bits, Ncnstl, qam_type, carrier_id, self.signal_id)
+        m = constellation.BITS_PER_SYMBOL[qam_type]
+        return constellation.modulate(bits, qam_type), np.reshape(bits, (-1, m))
 
     def QAMtoBit(self, **kwargs):
         """Method for generating binary array based on constellation points.
