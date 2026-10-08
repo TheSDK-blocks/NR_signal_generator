@@ -1068,7 +1068,6 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         BWP = kwargs.get("BWP")
         osr = kwargs.get("osr")
 
-        FFTwpos = 0
         end_of_prev_sig = 0
         equalize = self.equalizer
         cnstl_of_carrier = []
@@ -1117,36 +1116,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
             # circularly shift input vector so that PSS location becomes "as expected"
             invect_aligned = np.roll(sign, int(xcmax_id - xcmax) - 1)
 
-            # calculate shift of FFT window from "nominal" position (i.e. when CP is
-            # completely discarded)
-            # invect_aligned[:]=1
-            FFTw_shift_1 = -dl["Ncp1"] / 2 + FFTwpos
-            FFTw_shift_2 = -1 * np.ceil(dl["Ncp2"] / 2) + FFTwpos
-            long_cp = np.arange(N_symb_TOT) % (7 * 2**mu) == 0
-            FFTw_shift = np.where(long_cp, FFTw_shift_1, FFTw_shift_2)
-            FFTw_start = (starts[:-1] + ncp + FFTw_shift).astype(int)
-            OFDMmatrix = invect_aligned[FFTw_start[:, None] + np.arange(int(dl["NFFT"]))].T
-
-            # calculate compensation factor, due to shift of FFT window from "nominal"
-            # position (i.e. when CP is completely discarded)
-            k = np.arange(0, dl["NFFT"])
-            e = np.outer(
-                np.exp(-1j * 2 * np.pi * k * FFTw_shift_2 / dl["NFFT"]),
-                np.ones((int(N_symb_TOT))),
-            )
-            for index in np.arange(0, int(N_symb_TOT), (7 * 2**mu)):
-                e[:, int(index)] = np.exp(
-                    -1j * 2 * np.pi * k * FFTw_shift_1 / dl["NFFT"]
-                )
-
-            # calculate FFT and apply compensation factor
-            subcarriers = np.multiply(
-                np.transpose(np.fft.fft(np.transpose(OFDMmatrix))), e
-            )
-            # map subcarriers to resource elements
-            RE = np.zeros((int(dl["Nsc"]), int(N_symb_TOT)), complex)
-            RE[0 : int(dl["Nsc"] / 2), :] = subcarriers[int(-dl["Nsc"] / 2) :, :]
-            RE[int(dl["Nsc"] / 2) :, :] = subcarriers[0 : int(dl["Nsc"] / 2), :]
+            RE = ofdm.demodulate(invect_aligned, dl["NFFT"], ncp, dl["Nsc"])
             # if equalization is deactivated, return at this point already
             if equalize == "off":
                 cnstl = RE

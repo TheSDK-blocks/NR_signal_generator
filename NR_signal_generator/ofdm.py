@@ -83,3 +83,54 @@ def modulate(grid, nfft, ncp, n_roll):
         segment = symbols[(r - ncp[i]) % nfft, i] * window
         np.add.at(x, (starts[i] + r) % starts[-1], segment)
     return x
+
+
+def demodulate(x, nfft, ncp, n_sc):
+    """
+    Return the resource-element grid of an OFDM time signal.
+
+    The FFT window of each symbol starts in the middle of its cyclic prefix,
+    ceil(ncp_i / 2) samples before the nominal position, which keeps it clear
+    of the windowed start of the cyclic prefix and of timing errors in either
+    direction. The resulting linear phase is removed after the FFT.
+
+        s_i = -ceil(ncp_i / 2)
+        Y_i(k) = FFT{x(T_i + ncp_i + s_i + n)}(k) exp(-j 2 pi k s_i / nfft),  0 <= n < nfft
+
+    where T_i is the symbol start from symbol_starts. The grid is the n_sc
+    subcarriers centred on DC, in the same layout that modulate takes.
+
+    Parameters
+    ----------
+    x : array
+        Complex time signal, time-aligned so that the first symbol starts at
+        sample 0
+    nfft : integer
+        FFT size in samples
+    ncp : array
+        Cyclic prefix length of each OFDM symbol in samples
+    n_sc : integer
+        Number of occupied subcarriers, n_sc <= nfft
+
+    Returns
+    -------
+    Complex resource-element grid of shape (n_sc, len(ncp)).
+
+    Example
+    -------
+    demodulate(x, nfft=2048, ncp=nr_cp_lengths(14, 1, num), n_sc=1272)
+
+    """
+    nfft = int(nfft)
+    ncp = np.asarray(ncp).astype(int)
+    n_sc = int(n_sc)
+
+    shift = -np.ceil(ncp / 2)
+    window_start = (symbol_starts(ncp, nfft)[:-1] + ncp + shift).astype(int)
+    symbols = x[window_start[:, None] + np.arange(nfft)].T
+
+    k = np.arange(nfft)
+    bins = np.fft.fft(symbols, axis=0) * np.exp(-1j * 2 * np.pi * k[:, None] * shift / nfft)
+
+    pad_lo = nfft // 2 - n_sc // 2
+    return np.fft.fftshift(bins, axes=0)[pad_lo : pad_lo + n_sc]
