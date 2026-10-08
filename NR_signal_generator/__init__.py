@@ -546,38 +546,14 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
             )
         if gen == 1:
             self.BW_conf.append(RB * 12 * SCS)
-        temp1 = [
-            0,
-            5e6,
-            10e6,
-            15e6,
-            20e6,
-            25e6,
-            40e6,
-            50e6,
-            60e6,
-            80e6,
-            100e6,
-            200e6,
-            400e6,
-        ]
-        temp2 = [
-            0,
-            25 * 12 * 15e3,
-            52 * 12 * 15e3,
-            79 * 12 * 15e3,
-            106 * 12 * 15e3,
-            133 * 12 * 15e3,
-            216 * 12 * 15e3,
-            270 * 12 * 15e3,
-            162 * 12 * 30e3,
-            217 * 12 * 30e3,
-            273 * 12 * 30e3,
-            264 * 12 * 60e3,
-            264 * 12 * 120e3,
-        ]
-        if BW in temp1 and gen == 1:
-            self.ACLR_BW.append(temp2[np.where(temp1 == BW)[0][0]])
+            # ACLR filter: transmission bandwidth configuration of the SCS that
+            # provides the largest one (TS 38.104, Table 6.6.3.2-1, Note 2)
+            bw_config = [
+                n_rb[BW / 1e6] * 12 * 15e3 * 2**m
+                for m, n_rb in numerology.N_RB[self.FR].items()
+                if BW / 1e6 in n_rb
+            ]
+            self.ACLR_BW.append(max(bw_config))
 
         NFFT = 2 ** np.ceil(np.log2(RB * 12 / 0.9))  # FFT size
         NFFT = max(128, NFFT)
