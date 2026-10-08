@@ -71,7 +71,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
 
         self.IOS.Members["out"] = IO()  # Pointer for output data
 
-        self.BWP = np.array([[[4, 7, 0, 1]]])
+        self.BWP = np.array([[[4, 7, 0, 64]]])
         self.QAM = "64QAM"
         self.osr = 1
         self.BW = np.array([200e6])
@@ -357,10 +357,6 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
                 if hasattr(BWP[i], "__len__"):
                     for j in range(0, len(BWP[i])):
                         up = self.NRparameters(mu=BWP[i][j][0], BW=BW_vect_abs[i])
-                        start = up["RB"] * BWP[i][j][2]
-                        stop = up["RB"] * BWP[i][j][3]
-                        if stop < start:
-                            raise Exception("Wrong BW of BWP")
 
                         sub_fs.append(up["Fs"])
                         LCM = np.lcm(LCM, int(up["Fs"]))
@@ -691,11 +687,12 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
             Bandwidth of carrier
         BWP : array of certain structure
             Bandwidth part of corresponding carrier. [a,b,c,d]
-            where a=numerology,b=number of OFDM symbols, c=lowest used frequency of bandwidth in %
-            d=highest used frequency of bandwidth in %, 0=<c<d=<1.
+            where a=numerology, b=number of OFDM symbols, c=first resource block of
+            the BWP (N_BWP^start), d=number of resource blocks of the BWP
+            (N_BWP^size), c + d <= number of resource blocks of the carrier.
         Example
         -------
-        self.genQAM(bits=[1,0...1,2],BW=10e6, BWP=[0,14,0,1])
+        self.genQAM(bits=[1,0...1,2],BW=10e6, BWP=[0,14,0,52])
 
         """
 
@@ -728,11 +725,12 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
             Bandwidth of carrier
         BWP : array of certain structure
             Bandwidth part of corresponding carrier. [a,b,c,d]
-            where a=numerology,b=number of OFDM symbols, c=lowest used frequency of bandwidth in %
-            d=highest used frequency of bandwidth in %, 0=<c<d=<1.
+            where a=numerology, b=number of OFDM symbols, c=first resource block of
+            the BWP (N_BWP^start), d=number of resource blocks of the BWP
+            (N_BWP^size), c + d <= number of resource blocks of the carrier.
         Example
         -------
-        self.QAMtoBit(cnstl=[0.2+i*0.5,...,1-i*0,7], BW=10e6, BWP=[1,7,0,1])
+        self.QAMtoBit(cnstl=[0.2+i*0.5,...,1-i*0,7], BW=10e6, BWP=[1,7,0,24])
 
         """
 
@@ -770,15 +768,16 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
             Bandwidth of carrier
         BWP : array of certain structure
             Bandwidth part of corresponding carrier. [a,b,c,d]
-            where a=numerology,b=number of OFDM symbols, c=lowest used frequency of bandwidth in %
-            d=highest used frequency of bandwidth in %, 0=<c<d=<1.
+            where a=numerology, b=number of OFDM symbols, c=first resource block of
+            the BWP (N_BWP^start), d=number of resource blocks of the BWP
+            (N_BWP^size), c + d <= number of resource blocks of the carrier.
         osr : integer
             Oversampling factor
         cnstl : array
             Array of constellation points
         Example
         -------
-        self.genNRdownlink(BW=10e6, BWP=[2,7,0,1],osr=1, cnstl=[1-i*0.6,...,-0,6+i*0.3])
+        self.genNRdownlink(BW=15e6, BWP=[2,7,0,18],osr=1, cnstl=[1-i*0.6,...,-0,6+i*0.3])
 
         """
 
@@ -800,8 +799,8 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
 
             # RE=np.copy(cnstl)
             RE = np.full((dl["Nsc"], Nsymb), None)
-            start = int(np.floor(dl["RB"] * BWP[n][2]) * 12)
-            stop = int(np.ceil(dl["RB"] * BWP[n][3]) * 12)
+            start = 12 * int(BWP[n][2])
+            stop = 12 * int(BWP[n][2] + BWP[n][3])
             BW_of_BWP = (stop - start) * (15e3 * 2**mu)
             dl2 = self.NRparameters(
                 mu=mu, BW=BW_of_BWP, osr=osr[n]
@@ -1054,14 +1053,15 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
             Bandwidth
         BWP : array of certain structure
             Bandwidth part of corresponding carrier. [a,b,c,d]
-            where a=numerology,b=number of OFDM symbols, c=lowest used frequency of bandwidth in %
-            d=highest used frequency of bandwidth in %, 0=<c<d=<1.
+            where a=numerology, b=number of OFDM symbols, c=first resource block of
+            the BWP (N_BWP^start), d=number of resource blocks of the BWP
+            (N_BWP^size), c + d <= number of resource blocks of the carrier.
         osr : integer
             Oversampling factor
 
         Example
         -------
-        self.demNRdownlink(s=[0.3,...,0.7], BW=10e6,BWP=[1,14,0,1], osr=1)
+        self.demNRdownlink(s=[0.3,...,0.7], BW=10e6,BWP=[1,14,0,24], osr=1)
 
         """
 
@@ -1132,15 +1132,16 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
             Bandwidth
         BWP : array of certain structure
             Bandwidth part of corresponding carrier. [a,b,c,d]
-            where a=numerology,b=number of OFDM symbols, c=lowest used frequency of bandwidth in %
-            d=highest used frequency of bandwidth in %, 0=<c<d=<1.
+            where a=numerology, b=number of OFDM symbols, c=first resource block of
+            the BWP (N_BWP^start), d=number of resource blocks of the BWP
+            (N_BWP^size), c + d <= number of resource blocks of the carrier.
         cnstl : array
             Generated constellation points used as reference
         dem : array
             Recieved constellation points
         Example
         -------
-        self.measEVMdownlink(BW=10e6,BWP=[1,14,0,1],cnstl=[1-i*0.6,...,-0,6+i*0.3],dem=[1-i*0.6,...,-0,6+i*0.3])
+        self.measEVMdownlink(BW=10e6,BWP=[1,14,0,24],cnstl=[1-i*0.6,...,-0,6+i*0.3],dem=[1-i*0.6,...,-0,6+i*0.3])
 
         """
         BW = kwargs.get("BW")

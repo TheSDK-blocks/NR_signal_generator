@@ -35,7 +35,7 @@ def equalize(RE, RE_id, pilots):
 
     Example
     -------
-    equalize(RE, RE_id, pilots=dmrs_mask(n_rb=51, n_symb=14, lo=0, hi=1))
+    equalize(RE, RE_id, pilots=dmrs_mask(n_rb=51, n_symb=14, bwp_start=0, bwp_size=51))
 
     """
     if not pilots.any():

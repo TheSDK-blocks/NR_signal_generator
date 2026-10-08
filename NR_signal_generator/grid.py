@@ -33,12 +33,12 @@ def pss_symbol(n_symb):
     return l
 
 
-def dmrs_mask(n_rb, n_symb, lo, hi):
+def dmrs_mask(n_rb, n_symb, bwp_start, bwp_size):
     """
     Return the DMRS resource elements of a BWP grid.
 
     DMRS occupy the even subcarriers of the BWP, counted from its first
-    subcarrier floor(n_rb * lo) * 12, in symbols l with l mod 14 = DMRS_SYMBOL.
+    subcarrier 12 * bwp_start, in symbols l with l mod 14 = DMRS_SYMBOL.
 
     Parameters
     ----------
@@ -46,35 +46,47 @@ def dmrs_mask(n_rb, n_symb, lo, hi):
         Number of resource blocks of the carrier
     n_symb : integer
         Number of OFDM symbols
-    lo : float
-        Lower edge of the BWP as a fraction of the carrier
-    hi : float
-        Upper edge of the BWP as a fraction of the carrier
+    bwp_start : integer
+        First resource block of the BWP, N_BWP^start
+    bwp_size : integer
+        Number of resource blocks of the BWP, N_BWP^size
 
     Returns
     -------
     Boolean array of shape (12 * n_rb, n_symb), True for DMRS REs.
 
+    Raises
+    ------
+    ValueError
+        If the BWP is not whole resource blocks within the carrier.
+
     Example
     -------
-    dmrs_mask(n_rb=51, n_symb=14, lo=0, hi=1)
+    dmrs_mask(n_rb=51, n_symb=14, bwp_start=0, bwp_size=51)
 
     """
-    start = int(np.floor(n_rb * lo) * 12)
-    stop = int(np.ceil(n_rb * hi) * 12)
+    if bwp_start != int(bwp_start) or bwp_size != int(bwp_size):
+        raise ValueError(f"BWP start and size must be whole RBs, got {bwp_start}, {bwp_size}")
+    if bwp_start < 0 or bwp_size < 1 or bwp_start + bwp_size > n_rb:
+        raise ValueError(
+            f"BWP of {bwp_size} RBs from RB {bwp_start} does not fit the carrier of {n_rb} RBs"
+        )
+
+    start = 12 * int(bwp_start)
+    stop = 12 * int(bwp_start + bwp_size)
     mask = np.zeros((12 * n_rb, n_symb), dtype=bool)
     mask[start:stop:2, np.arange(n_symb) % 14 == DMRS_SYMBOL] = True
     return mask
 
 
-def data_re_mask(n_rb, n_symb, lo, hi):
+def data_re_mask(n_rb, n_symb, bwp_start, bwp_size):
     """
     Return the data resource elements of a BWP grid.
 
     mask: boolean array of shape (12 * n_rb, n_symb), True for data REs.
 
     Excluded REs:
-        - subcarriers outside [floor(n_rb * lo) * 12, ceil(n_rb * hi) * 12)
+        - subcarriers outside [12 * bwp_start, 12 * (bwp_start + bwp_size))
         - DMRS: even subcarriers of the BWP in symbols l with l mod 14 = 2
         - PSS block: 240 subcarriers centred in the carrier, symbol pss_symbol(n_symb)
 
@@ -83,13 +95,10 @@ def data_re_mask(n_rb, n_symb, lo, hi):
     DMRS comb is referenced to the BWP start instead of point A.
     """
     n_sc = 12 * n_rb
-    start = int(np.floor(n_rb * lo) * 12)
-    stop = int(np.ceil(n_rb * hi) * 12)
-
     mask = np.zeros((n_sc, n_symb), dtype=bool)
-    mask[start:stop] = True
-
-    mask[dmrs_mask(n_rb, n_symb, lo, hi)] = False
+    dmrs = dmrs_mask(n_rb, n_symb, bwp_start, bwp_size)
+    mask[12 * int(bwp_start) : 12 * int(bwp_start + bwp_size)] = True
+    mask[dmrs] = False
 
     pss_start = n_sc // 2 - 120
     mask[pss_start : pss_start + 240, pss_symbol(n_symb)] = False
@@ -97,7 +106,7 @@ def data_re_mask(n_rb, n_symb, lo, hi):
     return mask
 
 
-def reference_grid(n_rb, n_symb, mu, lo, hi, n_id_cell, n_id2):
+def reference_grid(n_rb, n_symb, mu, bwp_start, bwp_size, n_id_cell, n_id2):
     """
     Return the DMRS and PSS resource elements of a BWP grid.
 
@@ -114,7 +123,7 @@ def reference_grid(n_rb, n_symb, mu, lo, hi, n_id_cell, n_id2):
     is centred in the carrier instead of placed on the synchronization raster.
     """
     n_sc = 12 * n_rb
-    is_ref = dmrs_mask(n_rb, n_symb, lo, hi)
+    is_ref = dmrs_mask(n_rb, n_symb, bwp_start, bwp_size)
     k = np.flatnonzero(is_ref.any(axis=1))
     l = np.flatnonzero(is_ref.any(axis=0))
 
@@ -159,7 +168,7 @@ def data_symbols(re_grid, mask):
 
     Example
     -------
-    data_symbols(re_grid, data_re_mask(n_rb=51, n_symb=14, lo=0, hi=1))
+    data_symbols(re_grid, data_re_mask(n_rb=51, n_symb=14, bwp_start=0, bwp_size=51))
 
     """
     return re_grid.T[mask.T]
