@@ -34,13 +34,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 from plot_PSD import plot_PSD
 
+from . import carrier
 from . import constellation
 from . import equalizer
 from . import filters
 from . import grid
 from . import measurements
 from . import multicarrier
-from . import numerology
 from . import ofdm
 from . import sequences
 from . import sync
@@ -84,8 +84,6 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         self.include_time_vector = 0
         self.Fc_gen = 0
 
-        self.BW_conf = []
-        self.ACLR_BW = []
         self.model = "py"
         # Can be set externally, but is not propagated
         self.par = False  # By default, no parallel processingi
@@ -111,10 +109,13 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         if not hasattr(self.BW, "size"):
             self.BW = np.array([self.BW])
 
-        self.cnstl, self.gen_bits = self.genMultiQAM()
+        carriers = self.nr_carriers()
+        self.BW_conf = [c.bw_config for c in carriers if c is not None]
+        self.ACLR_BW = [c.aclr_bw for c in carriers if c is not None]
+        self.cnstl, self.gen_bits = self.genMultiQAM(carriers)
         if self.Fc_gen != 0:
             self.osr_based_on_Fc()
-        self.s_struct = self.genMultiNRdownlink()
+        self.s_struct = self.genMultiNRdownlink(carriers)
         if self.include_time_vector == 1:
             self.IOS.Members["out"].Data = self.s_struct[
                 "s"
@@ -144,10 +145,11 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         ].Data  # Input signal as matrix descibed in main_gen()
         if not hasattr(self.BW, "__len__"):
             self.BW = [self.BW]
+        carriers = self.nr_carriers()
         self.dem = self.demMultiNRdownlink(
-            car_return=car_return, sig_offset=sig_offset, NR_car_id=NR_car_id
+            carriers, car_return=car_return, sig_offset=sig_offset, NR_car_id=NR_car_id
         )
-        self.dem_bits, self.dem_cnstl_vec = self.MultiQAMtoBit(NR_car_id=NR_car_id)
+        self.dem_bits, self.dem_cnstl_vec = self.MultiQAMtoBit(carriers, NR_car_id=NR_car_id)
 
     def run_EVM(self, **kwargs):
         NR_car_id = kwargs.get("NR_car_id", -1)
@@ -169,6 +171,25 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
                 car_return=car_return, sig_offset=sig_offset, NR_car_id=NR_car_id
             )
 
+    def nr_carriers(self):
+        """
+        Return the carriers of the configuration.
+
+        Returns
+        -------
+        List with a carrier.Carrier for each positive entry of BW and None for gaps.
+        """
+        carriers = []
+        for bw, bwp in zip(self.BW, self.BWP):
+            if bw > 0:
+                c = carrier.Carrier(
+                    self.FR, float(bw), int(bwp[0]), int(bwp[1]), int(bwp[2]), int(bwp[3]), self.QAM
+                )
+                carriers.append(c)
+            else:
+                carriers.append(None)
+        return carriers
+
     def osr_based_on_Fc(self):
         BW_vect_abs = np.abs(self.BW)
         BW_tot = np.sum(BW_vect_abs)  # get total bandwidth (in Hz)
@@ -180,7 +201,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         else:
             self.osr = osr
 
-    def MultiQAMtoBit(self, **kwargs):
+    def MultiQAMtoBit(self, carriers, **kwargs):
         """Method for calculate binary data based on recieved constellation points for multiple carriers.
 
 
@@ -191,15 +212,12 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         """
         NR_car_id = kwargs.get("NR_car_id", -1)
 
-        qam_type = self.QAM
         dem = self.dem
-        BW = self.BW
-        BWP = self.BWP
         bits = []
         dem_cnstl_vec = []
-        for i in range(0, len(dem)):
-            if BW[i] > 0 and (NR_car_id == -1 or i == NR_car_id):
-                temp1, temp2 = self.QAMtoBit(cnstl=dem[i], BW=BW[i], BWP=BWP[i])
+        for i, c in enumerate(carriers):
+            if c is not None and (NR_car_id == -1 or i == NR_car_id):
+                temp1, temp2 = self.QAMtoBit(dem[i], c)
                 bits.append(temp1)
                 dem_cnstl_vec.append(temp2)
             else:
@@ -233,7 +251,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
                 EVM.append(np.array([]))
         return EVM
 
-    def demMultiNRdownlink(self, **kwargs):
+    def demMultiNRdownlink(self, carriers, **kwargs):
         """Method for demodulate constellation points from recieved signal for multiple carriers.
 
         The received signal must be one period of a cyclic signal, as produced
@@ -257,8 +275,6 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         plan = multicarrier.plan(self.FR, BW, BWP, self.osr)
         Fs = plan["Fs"]
         f_off = plan["f_off"]
-        FFRwpos = 0
-        N_BW = BW.size
         cnstl = []
         # t=np.arange(0,sign.size)/Fs # initialize time vector (for mixing)
         if sign.shape[1] == 2:
@@ -268,9 +284,8 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
             t = sign[:, 0]
             s = sign[:, 1] + 1j * sign[:, 2]
         # demodulate carriers
-        for i in range(0, N_BW):
-            BWi = BW[i]
-            if BWi > 0 and (NR_car_id == -1 or i == NR_car_id):
+        for i, c in enumerate(carriers):
+            if c is not None and (NR_car_id == -1 or i == NR_car_id):
 
                 # mix current carrier so that it is centered at 0 Hz
                 if car_return == False:
@@ -281,19 +296,19 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
 
                 v_filt = v_mixed
                 if self.rx_filter:
-                    v_filt = filters.nr_filter(v_mixed, Fs, BWi, self.FR)
+                    v_filt = filters.nr_filter(v_mixed, Fs, c.bw, c.fr)
 
                 if car_return == True:
                     t2 = np.arange(0, len(v_filt)) / Fs
                     v_filt = v_filt * np.exp(+1j * 2 * np.pi * carrier_offset * t2)
 
-                a = self.demNRdownlink(s=v_filt, BW=BWi, BWP=BWP[i], osr=plan["osr"][i])
+                a = self.demNRdownlink(v_filt, c, plan["osr"][i])
                 cnstl.append(a)
             else:
                 cnstl.append(np.array([]))
         return cnstl
 
-    def genMultiNRdownlink(self):
+    def genMultiNRdownlink(self, carriers):
         """Method for generating signal from constellation points for multiple carriers.
 
 
@@ -314,25 +329,20 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
 
         smatrix = np.zeros((plan["length"], int(N_BW)), complex)
         # generate carriers
-        for i in range(0, N_BW):
-            BWi = BW[i]
-            if BWi > 0:
-                out = self.genNRdownlink(BW=BWi, BWP=BWP[i], osr=osr[i], cnstl=cnstl[i])
-
-                s = out["s"]
+        for i, c in enumerate(carriers):
+            if c is not None:
+                s = self.genNRdownlink(c, osr[i], cnstl[i])
                 self.testvar = s
                 if self.tx_filter:
-                    s = filters.nr_filter(s, Fs, BWi, self.FR)
+                    s = filters.nr_filter(s, Fs, c.bw, c.fr)
                 smatrix[0 : len(s), i] = self.normalize(s, "max")
 
         s_raw = np.zeros(len(smatrix), complex)
 
         # mix carriers to proper frequency offset
         t_vect = np.arange(0, len(smatrix)) / Fs
-        for i in range(0, N_BW):
-            BWi = BW[i]
-
-            if BWi > 0:
+        for i, c in enumerate(carriers):
+            if c is not None:
                 s_raw = s_raw + smatrix[:, i] * np.exp(
                     1j * 2 * np.pi * (self.Fc_gen + f_off[i]) * t_vect
                 )
@@ -345,163 +355,103 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
 
         return out
 
-    def genMultiQAM(self):
-        """Method for generating QAM constellation points based on input bits for multiple carriers.
-
-        Example
-        -------
-        self.genMultiQAM()
-
+    def genMultiQAM(self, carriers):
         """
-        BW = self.BW
-        BWP = self.BWP
-        qam_type = self.QAM
-        bits = self.in_bits
-
-        N_BW = BW.size
-        cnstl = []
-        gen_bits = []
-        for i in range(0, N_BW):
-            BWi = BW[i]
-            if BWi > 0:
-                a, bit = self.genQAM(carrier_id=i, bits=bits[i], BW=BW[i], BWP=BWP[i])
-                cnstl.append(a)
-                gen_bits.append(bit)
-            else:
-                cnstl.append([])
-                gen_bits.append([])
-        return cnstl, gen_bits
-
-    def genQAM(self, **kwargs):
-        """Method for generating constellation point based on input bits.
+        Return the data symbols and bits of each carrier.
 
         Parameters
         ----------
+        carriers : list
+            carrier.Carrier of each entry of BW, None for gaps
+
+        Returns
+        -------
+        Data symbols and bits of each carrier, empty for gaps.
+        """
+        cnstl = []
+        gen_bits = []
+        for i, c in enumerate(carriers):
+            if c is None:
+                cnstl.append([])
+                gen_bits.append([])
+            else:
+                a, bit = self.genQAM(i, self.in_bits[i], c)
+                cnstl.append(a)
+                gen_bits.append(bit)
+        return cnstl, gen_bits
+
+    def genQAM(self, carrier_id, bits, c):
+        """
+        Return the data symbols of a carrier and the bits they carry.
+
+        Parameters
+        ----------
+        carrier_id : integer
+            Index of the carrier
         bits : array of binary values
            Binary input data that exactly fill every data resource element of
            the BWP, or "max" for pseudorandom bits. "max" stands in for MAC
            padding and scrambling and is seeded from carrier_id and signal_id,
            so it is reproducible. User data shorter than the allocation must be
            padded by the caller, e.g. with pseudorandom bits.
-        BW : integer
-            Bandwidth of carrier
-        BWP : array of certain structure
-            Bandwidth part of corresponding carrier. [a,b,c,d]
-            where a=numerology, b=number of OFDM symbols, c=first resource block of
-            the BWP (N_BWP^start), d=number of resource blocks of the BWP
-            (N_BWP^size), c + d <= number of resource blocks of the carrier.
-        Example
+        c : carrier.Carrier
+            Carrier
+
+        Returns
         -------
-        self.genQAM(bits=[1,0...1,2],BW=10e6, BWP=[0,14,0,52])
-
+        Data symbols, and the bits as an array of one row per symbol.
         """
-
-        carrier_id = kwargs.get("carrier_id")
-        bits = kwargs.get("bits")
-        BW = kwargs.get("BW")
-        BWP = kwargs.get("BWP")
-
-        qam_type = self.QAM
-        dl = numerology.nr_parameters(self.FR, BWP[0], BW)
-        Nsymb = int(BWP[1])
-        Ncnstl = int(grid.data_re_mask(dl["RB"], Nsymb, BWP[2], BWP[3]).sum())
-        m = constellation.BITS_PER_SYMBOL[qam_type]
-
+        m = constellation.BITS_PER_SYMBOL[c.qam]
         if isinstance(bits, str) and bits == "max":
             seed = (carrier_id + self.signal_id * 13 + 1) * 123
             rng = np.random.RandomState(seed)
-            bits = rng.randint(2, size=m * Ncnstl)
-        elif len(bits) != m * Ncnstl:
+            bits = rng.randint(2, size=c.n_bits)
+        elif len(bits) != c.n_bits:
             raise ValueError(
-                f"carrier {carrier_id}: {len(bits)} bits do not fill the {m * Ncnstl}-bit allocation"
+                f"carrier {carrier_id}: {len(bits)} bits do not fill the {c.n_bits}-bit allocation"
             )
 
-        return constellation.modulate(bits, qam_type), np.reshape(bits, (-1, m))
+        return constellation.modulate(bits, c.qam), np.reshape(bits, (-1, m))
 
-    def QAMtoBit(self, **kwargs):
-        """Method for generating binary array based on constellation points.
+    def QAMtoBit(self, cnstl, c):
+        """
+        Return the bits and data symbols of an equalized resource-element grid.
 
         Parameters
         ----------
         cnstl : array
-           Array of constellation points
-        BW : integer
-            Bandwidth of carrier
-        BWP : array of certain structure
-            Bandwidth part of corresponding carrier. [a,b,c,d]
-            where a=numerology, b=number of OFDM symbols, c=first resource block of
-            the BWP (N_BWP^start), d=number of resource blocks of the BWP
-            (N_BWP^size), c + d <= number of resource blocks of the carrier.
-        Example
+            Equalized resource-element grid of the carrier
+        c : carrier.Carrier
+            Carrier
+
+        Returns
         -------
-        self.QAMtoBit(cnstl=[0.2+i*0.5,...,1-i*0,7], BW=10e6, BWP=[1,7,0,24])
-
+        Demapped bits and data symbols.
         """
+        data = grid.data_symbols(cnstl, c.data_mask)
+        return constellation.demodulate(data, c.qam), data
 
-        cnstl = kwargs.get("cnstl")
-        BW = kwargs.get("BW")
-        BWP = kwargs.get("BWP")
-
-        qam_type = self.QAM
-
-        mu = BWP[0]
-        dl = numerology.nr_parameters(self.FR, mu, BW)  # get NR parameters
-        N_ID_1 = 0  # physical-layer cell-identity group
-        N_ID_2 = 0  # physical-layer identity within the group
-        N_ID_cell = 3 * N_ID_1 + N_ID_2  # cell identity
-        Nsymb = int(BWP[1])
-        mask = grid.data_re_mask(dl["RB"], Nsymb, BWP[2], BWP[3])
-        DataSymbols_nzero = grid.data_symbols(cnstl, mask)
-        vector = constellation.demodulate(DataSymbols_nzero, qam_type)
-        return vector, DataSymbols_nzero
-
-    def genNRdownlink(self, **kwargs):
-        """Method for generating 5G NR signal based on constellation points.
+    def genNRdownlink(self, c, osr, cnstl):
+        """
+        Return the OFDM signal of a carrier.
 
         Parameters
         ----------
-        BW : integer
-            Bandwidth of carrier
-        BWP : array of certain structure
-            Bandwidth part of corresponding carrier. [a,b,c,d]
-            where a=numerology, b=number of OFDM symbols, c=first resource block of
-            the BWP (N_BWP^start), d=number of resource blocks of the BWP
-            (N_BWP^size), c + d <= number of resource blocks of the carrier.
+        c : carrier.Carrier
+            Carrier
         osr : integer
             Oversampling factor
         cnstl : array
-            Array of constellation points
-        Example
+            Data symbols of the carrier
+
+        Returns
         -------
-        self.genNRdownlink(BW=15e6, BWP=[2,7,0,18],osr=1, cnstl=[1-i*0.6,...,-0,6+i*0.3])
-
+        Complex baseband signal.
         """
-
-        BW = kwargs.get("BW")
-        BWP = kwargs.get("BWP")
-        osr = kwargs.get("osr")
-        cnstl = kwargs.get("cnstl")
-
-        mu = BWP[0]
-        dl = numerology.nr_parameters(self.FR, mu, BW, osr)
-        self.BW_conf.append(dl["RB"] * 12 * 2**mu * 15e3)
-        self.ACLR_BW.append(numerology.max_bw_config(self.FR, BW))
-        N_ID_1 = 0  # physical-layer cell-identity group
-        N_ID_2 = 0  # physical-layer identity within the group
-        N_ID_cell = 3 * N_ID_1 + N_ID_2  # cell identity
-        Nsymb = int(BWP[1])
-        ncp = numerology.nr_cp_lengths(Nsymb, mu, dl)
-
-        values, is_ref = grid.reference_grid(
-            dl["RB"], Nsymb, mu, BWP[2], BWP[3], N_ID_cell, N_ID_2
-        )
-        mask = grid.data_re_mask(dl["RB"], Nsymb, BWP[2], BWP[3])
-        RE = grid.map_data(values, mask, cnstl)
-
-        s = ofdm.modulate(RE, dl["NFFT"], ncp, dl["Lroll"] * osr)
-        out = {"s": s, "Fs": dl["Fs"]}
-
-        return out
+        dl = c.parameters(osr)
+        values, is_ref = c.reference_grid
+        RE = grid.map_data(values, c.data_mask, cnstl)
+        return ofdm.modulate(RE, dl["NFFT"], c.cp_lengths(osr), dl["Lroll"] * osr)
 
     def normalize(self, x, opt):
         """
@@ -527,60 +477,31 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
             raise ValueError(f'normalization must be "max" or "amp", got {opt}')
         return x / peak
 
-    def demNRdownlink(self, **kwargs):
-        """Method for demodulation signal.
+    def demNRdownlink(self, s, c, osr):
+        """
+        Return the equalized resource-element grid of a carrier.
 
         Parameters
         ----------
         s : array
-           Signal
-        BW : integer
-            Bandwidth
-        BWP : array of certain structure
-            Bandwidth part of corresponding carrier. [a,b,c,d]
-            where a=numerology, b=number of OFDM symbols, c=first resource block of
-            the BWP (N_BWP^start), d=number of resource blocks of the BWP
-            (N_BWP^size), c + d <= number of resource blocks of the carrier.
+            One period of the carrier signal at baseband
+        c : carrier.Carrier
+            Carrier
         osr : integer
             Oversampling factor
 
-        Example
+        Returns
         -------
-        self.demNRdownlink(s=[0.3,...,0.7], BW=10e6,BWP=[1,14,0,24], osr=1)
-
+        Equalized resource-element grid.
         """
-
-        s = kwargs.get("s")
-        BW = kwargs.get("BW")
-        BWP = kwargs.get("BWP")
-        osr = kwargs.get("osr")
-
-        mu = BWP[0]
-        N_symb_TOT = int(BWP[1])
-
-        # get various parameters related to input signal
-        dl = numerology.nr_parameters(self.FR, mu, BW, osr)  # general NR parameters
-        ncp = numerology.nr_cp_lengths(N_symb_TOT, mu, dl)
+        dl = c.parameters(osr)
+        ncp = c.cp_lengths(osr)
         starts = ofdm.symbol_starts(ncp, dl["NFFT"])
-        sign = s
-        N_sampl = len(s)
-        N_slots = np.floor(N_symb_TOT / 14)  # number of slots (integer)
-        N_ID_1 = 0  # physical-layer cell-identity group
-        N_ID_2 = 0  # physical-layer identity within the group
-        N_ID_cell = 3 * N_ID_1 + N_ID_2  # cell identity
-        if N_symb_TOT == 0:
-            print("ERROR")
-            return 0
-        l_pss = grid.pss_symbol(N_symb_TOT)
-        invect_aligned = sync.pss_align(sign, dl["NFFT"], starts[l_pss] + ncp[l_pss], N_ID_2)
+        l_pss = grid.pss_symbol(c.n_symb)
+        aligned = sync.pss_align(s, dl["NFFT"], starts[l_pss] + ncp[l_pss], c.n_id_2)
+        RE = ofdm.demodulate(aligned, dl["NFFT"], ncp, dl["Nsc"])
 
-        RE = ofdm.demodulate(invect_aligned, dl["NFFT"], ncp, dl["Nsc"])
-        # re-create DMRS/PSS grid (i.e. post-FFT ideal reference signal)
-        RE_id = np.ones((RE.shape), complex)
-        values, is_ref = grid.reference_grid(
-            dl["RB"], N_symb_TOT, mu, BWP[2], BWP[3], N_ID_cell, N_ID_2
-        )
+        values, is_ref = c.reference_grid
+        RE_id = np.ones(RE.shape, complex)
         RE_id[is_ref] = values[is_ref]
-        pilots = grid.dmrs_mask(dl["RB"], N_symb_TOT, BWP[2], BWP[3])
-
-        return equalizer.equalize(RE, RE_id, pilots)
+        return equalizer.equalize(RE, RE_id, c.pilot_mask)
