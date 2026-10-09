@@ -63,7 +63,9 @@ elif hasattr(BW, "__len__"):
     plt.plot(test.s_struct["s"][:, 0], test.s_struct["s"][:, 1])
     plt.plot(test.s_struct["s"][:, 0], test.s_struct["s"][:, 2])
     plt.show(block=False)
-    print(test.EVM)
+    for i in range(0, BW.size):
+        if np.size(test.EVM[i]):
+            print(f"Carrier {i}: EVM {100 * test.EVM[i]:.4f} %")
     for i in range(0, BW.size):
         if np.size(test.EVM[i]) and test.EVM[i] != 0:
             plt.figure()
