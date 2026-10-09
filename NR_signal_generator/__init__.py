@@ -93,7 +93,6 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         self.IOS.Members["control_write"] = IO()
         self.tx_filter = True  # transmit channel filter in the generator
         self.rx_filter = True  # receive channel-select filter in the analyzer
-        self.equalizer = "on"
 
         self.norm = (
             "max"  # max = normalize I & Q separately, amp = normalize amplitude to one
@@ -556,7 +555,6 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         BWP = kwargs.get("BWP")
         osr = kwargs.get("osr")
 
-        equalize = self.equalizer
         mu = BWP[0]
         N_symb_TOT = int(BWP[1])
 
@@ -577,9 +575,6 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         invect_aligned = sync.pss_align(sign, dl["NFFT"], starts[l_pss] + ncp[l_pss], N_ID_2)
 
         RE = ofdm.demodulate(invect_aligned, dl["NFFT"], ncp, dl["Nsc"])
-        # if equalization is deactivated, return at this point already
-        if equalize == "off":
-            return RE
         # re-create DMRS/PSS grid (i.e. post-FFT ideal reference signal)
         RE_id = np.ones((RE.shape), complex)
         values, is_ref = grid.reference_grid(
