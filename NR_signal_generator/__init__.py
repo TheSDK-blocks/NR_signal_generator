@@ -347,7 +347,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
 
         slength = max(osr[i] * slength[i] for i in range(0, N_BW) if BW[i] > 0)
         Fs = maxsf * min(osr)
-        smatrix = np.zeros((int(slength + self.fil_len * max(osr)), int(N_BW)), complex)
+        smatrix = np.zeros((int(slength), int(N_BW)), complex)
         cnstlmatrix = []
         # generate carriers
         for i in range(0, N_BW):
@@ -370,12 +370,12 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
             else:
                 cnstlmatrix.append([])
 
-        s_raw = np.zeros(int(slength + self.fil_len), complex)
+        s_raw = np.zeros(len(smatrix), complex)
         BWtot = np.sum(BW_vect_abs)  # get total bandwidth (in Hz)
 
         # mix carriers to proper frequency offset
         f_off = np.zeros(N_BW)
-        t_vect = np.arange(0, slength + self.fil_len) / Fs
+        t_vect = np.arange(0, len(smatrix)) / Fs
         for i in range(0, N_BW):
             BWi = BW[i]
 
