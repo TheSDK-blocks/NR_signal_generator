@@ -89,7 +89,8 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         self.par = False  # By default, no parallel processingi
         self.queue = []  # By default, no parallel processing
         self.IOS.Members["control_write"] = IO()
-        self.fil = "on"
+        self.tx_filter = True  # transmit channel filter in the generator
+        self.rx_filter = True  # receive channel-select filter in the analyzer
         self.equalizer = "on"
 
         self.fil_len = 0  # 100
@@ -283,7 +284,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
                 osr = np.around(Fs / dl_osrl["Fs"])
 
                 v_filt = v_mixed
-                if self.fil == "on":
+                if self.rx_filter:
                     v_filt, self.fil_len = filters.nr_filter(v_mixed, Fs, BWi, self.FR)
 
                 if car_return == True:
@@ -357,7 +358,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
 
                 s = out["s"]
                 self.testvar = s
-                if self.fil == "on":
+                if self.tx_filter:
                     s = np.pad(s, (0, (int(slength) - len(s))), constant_values=0)
                     s, self.fil_len = filters.nr_filter(s, Fs, BWi, self.FR)
                 if len(s) > len(smatrix):
