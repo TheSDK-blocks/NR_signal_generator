@@ -344,21 +344,17 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         slength = max(osr[i] * slength[i] for i in range(0, N_BW) if BW[i] > 0)
         Fs = maxsf * min(osr)
         smatrix = np.zeros((int(slength), int(N_BW)), complex)
-        cnstlmatrix = []
         # generate carriers
         for i in range(0, N_BW):
             BWi = BW[i]
             if BWi > 0:
                 out = self.genNRdownlink(BW=BWi, BWP=BWP[i], osr=osr[i], cnstl=cnstl[i])
-                cnstlmatrix.append(out["cnstl"])
 
                 s = out["s"]
                 self.testvar = s
                 if self.tx_filter:
                     s = filters.nr_filter(s, Fs, BWi, self.FR)
                 smatrix[0 : len(s), i] = self.normalize(s, "max")
-            else:
-                cnstlmatrix.append([])
 
         s_raw = np.zeros(len(smatrix), complex)
         BWtot = np.sum(BW_vect_abs)  # get total bandwidth (in Hz)
@@ -378,7 +374,6 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         output_format = np.transpose(np.vstack((t_vect, np.real(s), np.imag(s))))
         out = {
             "s": output_format,
-            "cnstl": cnstlmatrix,
             "Fs": Fs,
         }
 
@@ -538,7 +533,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         RE = grid.map_data(values, mask, cnstl)
 
         s = ofdm.modulate(RE, dl["NFFT"], ncp, dl["Lroll"] * osr)
-        out = {"s": s, "cnstl": RE, "Fs": dl["Fs"]}
+        out = {"s": s, "Fs": dl["Fs"]}
 
         return out
 
