@@ -80,9 +80,8 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         self.tx_filter = True  # transmit channel filter in the generator
         self.rx_filter = True  # receive channel-select filter in the analyzer
 
-        self.norm = (
-            "max"  # max = normalize I & Q separately, amp = normalize amplitude to one, None = volts
-        )
+        self.norm = "max"  # peak normalization, see generator.normalize
+        self.backoff_db = 0.0  # peak back-off from one in dB, see generator.normalize
 
         self.signal_id = 0  # used for generating different seeds for different signals
 
@@ -102,7 +101,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         self.gen_bits = [constellation.demodulate(s, c.qam) for c, s in zip(self.carriers, self.cnstl)]
 
         Fs = multicarrier.plan(self.carriers, self.osr)["Fs"]
-        s = self.normalize(x, self.norm)
+        s = generator.normalize(x, self.norm, self.backoff_db)
         t = np.arange(len(s)) / Fs
         self.s_struct = {"s": np.transpose(np.vstack((t, np.real(s), np.imag(s)))), "Fs": Fs}
         if self.include_time_vector == 1:
@@ -129,30 +128,3 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
     def run_dem(self, *arg):
         if self.model == "py":
             self.main_dem()
-
-    def normalize(self, x, opt):
-        """
-        Return x scaled to a peak of one, or unscaled.
-
-        Parameters
-        ----------
-        x : array
-            Complex signal
-        opt : string ("max", "amp") or None
-            "max" scales max(|Re(x)|, |Im(x)|) to one, "amp" scales max(|x|) to
-            one, None returns x unscaled, in volts as set by the carrier powers
-
-        Returns
-        -------
-        Scaled signal.
-        """
-        if opt is None:
-            return x
-        if opt == "max":
-            parts = np.concatenate((np.abs(x.real), np.abs(x.imag)))
-            peak = parts.max()
-        elif opt == "amp":
-            peak = np.abs(x).max()
-        else:
-            raise ValueError(f'normalization must be "max" or "amp", got {opt}')
-        return x / peak

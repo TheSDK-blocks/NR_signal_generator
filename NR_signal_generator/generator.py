@@ -106,3 +106,35 @@ def generate(carriers, osr=1, tx_filter=True, bits=None, seed=0):
         y = y * np.sqrt(c.mean_square / np.mean(np.abs(y) ** 2))
         x = x + multicarrier.mix(y, fs, c.offset)
     return x, symbols
+
+
+def normalize(x, norm="max", backoff_db=0.0):
+    """
+    Return x scaled to a peak of backoff_db below one, or unscaled.
+
+    Parameters
+    ----------
+    x : array
+        Complex signal
+    norm : string ("max", "amp") or None
+        "max" scales max(|Re(x)|, |Im(x)|), the peak of each of I and Q, and
+        "amp" scales max(|x|); None returns x unscaled, in volts as set by the
+        carrier powers
+    backoff_db : float
+        Back-off of the peak from one in dB, e.g. 1 for a peak of -1 dBFS
+
+    Returns
+    -------
+    Scaled signal.
+    """
+    if norm is None:
+        return x
+    if norm == "max":
+        parts = np.concatenate((np.abs(x.real), np.abs(x.imag)))
+        peak = parts.max()
+    elif norm == "amp":
+        peak = np.abs(x).max()
+    else:
+        raise ValueError(f'normalization must be "max", "amp" or None, got {norm}')
+    target = 10 ** (-backoff_db / 20)
+    return x / peak * target
