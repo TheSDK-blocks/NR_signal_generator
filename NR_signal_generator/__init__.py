@@ -242,6 +242,11 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
     def demMultiNRdownlink(self, **kwargs):
         """Method for demodulate constellation points from recieved signal for multiple carriers.
 
+        The received signal must be one period of a cyclic signal, as produced
+        by the generator: the receive filter, the PSS alignment and the FFT
+        windows all treat it as periodic. Non-cyclic signals, such as arbitrary
+        captures, are not supported.
+
         Example
         -------
         self.demMultiNRdownlink()
