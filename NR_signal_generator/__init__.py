@@ -85,7 +85,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         self.rx_filter = True  # receive channel-select filter in the analyzer
 
         self.norm = (
-            "max"  # max = normalize I & Q separately, amp = normalize amplitude to one
+            "max"  # max = normalize I & Q separately, amp = normalize amplitude to one, None = volts
         )
 
         self.signal_id = 0  # used for generating different seeds for different signals
@@ -267,7 +267,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
             self.testvar = s
             if self.tx_filter:
                 s = filters.nr_filter(s, Fs, c.bw, c.fr)
-            smatrix[:, i] = self.normalize(s, "max")
+            smatrix[:, i] = s * np.sqrt(c.mean_square / np.mean(np.abs(s) ** 2))
 
         s_raw = np.zeros(len(smatrix), complex)
 
@@ -380,19 +380,22 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
 
     def normalize(self, x, opt):
         """
-        Return x scaled to a peak of one.
+        Return x scaled to a peak of one, or unscaled.
 
         Parameters
         ----------
         x : array
             Complex signal
-        opt : string ("max", "amp")
-            "max" scales max(|Re(x)|, |Im(x)|) to one, "amp" scales max(|x|) to one
+        opt : string ("max", "amp") or None
+            "max" scales max(|Re(x)|, |Im(x)|) to one, "amp" scales max(|x|) to
+            one, None returns x unscaled, in volts as set by the carrier powers
 
         Returns
         -------
         Scaled signal.
         """
+        if opt is None:
+            return x
         if opt == "max":
             parts = np.concatenate((np.abs(x.real), np.abs(x.imag)))
             peak = parts.max()

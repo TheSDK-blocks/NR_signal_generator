@@ -28,6 +28,8 @@ class Carrier:
         Modulation of the data resource elements
     offset : float
         Carrier centre frequency relative to the signal centre in Hz
+    power_dbm : float
+        Carrier mean power into a 50 ohm load in dBm, see mean_square
     bwp_start : integer
         First resource block of the BWP, N_BWP^start
     bwp_size : integer or None
@@ -43,6 +45,7 @@ class Carrier:
     duration: float
     qam: str
     offset: float = 0.0
+    power_dbm: float = 0.0
     bwp_start: int = 0
     bwp_size: int = None
     n_id_cell: int = 0
@@ -128,6 +131,18 @@ class Carrier:
         values.flags.writeable = False
         is_ref.flags.writeable = False
         return values, is_ref
+
+    @cached_property
+    def mean_square(self):
+        """
+        Mean square of the carrier's complex envelope x in V^2 at power_dbm.
+
+        x is the peak envelope of the RF signal Re{x exp(j 2 pi f t)} across
+        R = 50 ohm, so the carrier power is mean(|x|^2) / (2 R).
+        """
+        load = 50.0
+        power = 1e-3 * 10 ** (self.power_dbm / 10)
+        return 2 * load * power
 
     @cached_property
     def n_bits(self):
