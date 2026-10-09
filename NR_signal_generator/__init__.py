@@ -39,6 +39,7 @@ from . import equalizer
 from . import filters
 from . import grid
 from . import measurements
+from . import multicarrier
 from . import numerology
 from . import ofdm
 from . import sequences
@@ -114,7 +115,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         self.cnstl, self.gen_bits = self.genMultiQAM()
         if self.Fc_gen != 0:
             self.osr_based_on_Fc()
-        self.s_struct, self.f_off = self.genMultiNRdownlink()
+        self.s_struct = self.genMultiNRdownlink()
         if self.include_time_vector == 1:
             self.IOS.Members["out"].Data = self.s_struct[
                 "s"
@@ -254,15 +255,16 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         sign = self.rec_sig
         BW = self.BW
         BWP = self.BWP
-        Fs = self.s_struct["Fs"]
-        f_off = self.f_off
+        plan = multicarrier.plan(self.FR, BW, BWP, self.osr)
+        Fs = plan["Fs"]
+        f_off = plan["f_off"]
         FFRwpos = 0
         N_BW = BW.size
         cnstl = []
         # t=np.arange(0,sign.size)/Fs # initialize time vector (for mixing)
         if sign.shape[1] == 2:
             s = sign[:, 0] + 1j * sign[:, 1]
-            t = t = np.arange(0, len(s)) / self.s_struct["Fs"]
+            t = np.arange(0, len(s)) / Fs
         else:
             t = sign[:, 0]
             s = sign[:, 1] + 1j * sign[:, 2]
@@ -277,19 +279,16 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
                 else:
                     carrier_offset = self.Fc_gen + f_off[i] + sig_offset
                     v_mixed = s * np.exp(-1j * 2 * np.pi * carrier_offset * t)
-                # calculate OSR of current carrier
-                dl_osrl = numerology.nr_parameters(self.FR, BWP[i][0], BW[i])
-                osr = np.around(Fs / dl_osrl["Fs"])
 
                 v_filt = v_mixed
                 if self.rx_filter:
                     v_filt = filters.nr_filter(v_mixed, Fs, BWi, self.FR)
 
                 if car_return == True:
-                    t2 = np.arange(0, len(v_filt)) / self.s_struct["Fs"]
+                    t2 = np.arange(0, len(v_filt)) / Fs
                     v_filt = v_filt * np.exp(+1j * 2 * np.pi * carrier_offset * t2)
 
-                a = self.demNRdownlink(s=v_filt, BW=BWi, BWP=BWP[i], osr=osr)
+                a = self.demNRdownlink(s=v_filt, BW=BWi, BWP=BWP[i], osr=plan["osr"][i])
                 cnstl.append(a)
             else:
                 cnstl.append(np.array([]))
@@ -305,45 +304,16 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
 
         """
 
-        # NOFDMsym=cnstl[0][0].size
         BW = self.BW
         BWP = self.BWP
-        tot_osr = self.osr
         cnstl = self.cnstl
         N_BW = BW.size
-        NFFT = []
-        Fss = []
-        LCM = int(1)
+        plan = multicarrier.plan(self.FR, BW, BWP, self.osr)
+        Fs = plan["Fs"]
+        osr = plan["osr"]
+        f_off = plan["f_off"]
 
-        # get integers proportional to base sampling rates
-        # get also their LCM (least common multiple)
-        BW_vect_abs = np.abs(BW)
-        maxsf = 0
-        slength = np.zeros(N_BW)
-        for i in range(0, N_BW):
-            if BW[i] != 0:
-                up = numerology.nr_parameters(self.FR, BWP[i][0], BW_vect_abs[i])
-                Fss.append(up["Fs"])
-                LCM = np.lcm(LCM, int(up["Fs"]))
-                if BW[i] > 0:
-                    NFFT.append(up["NFFT"])
-                    ncp = numerology.nr_cp_lengths(BWP[i][1], BWP[i][0], up)
-                    slength[i] = ofdm.symbol_starts(ncp, up["NFFT"])[-1]
-                if up["Fs"] > maxsf:
-                    maxsf = up["Fs"]
-            else:
-                Fss.append(0)
-
-        # get integer proportional to overall sampling rate
-        self.NFFT_debug = max(NFFT)
-        Fss = np.array(Fss)
-        NFFT_tot = tot_osr * LCM * np.ceil(Fss.sum() / LCM)
-        # calculate individual oversampling ratios
-        osr = NFFT_tot / Fss[Fss != 0]
-
-        slength = max(osr[i] * slength[i] for i in range(0, N_BW) if BW[i] > 0)
-        Fs = maxsf * min(osr)
-        smatrix = np.zeros((int(slength), int(N_BW)), complex)
+        smatrix = np.zeros((plan["length"], int(N_BW)), complex)
         # generate carriers
         for i in range(0, N_BW):
             BWi = BW[i]
@@ -357,16 +327,13 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
                 smatrix[0 : len(s), i] = self.normalize(s, "max")
 
         s_raw = np.zeros(len(smatrix), complex)
-        BWtot = np.sum(BW_vect_abs)  # get total bandwidth (in Hz)
 
         # mix carriers to proper frequency offset
-        f_off = np.zeros(N_BW)
         t_vect = np.arange(0, len(smatrix)) / Fs
         for i in range(0, N_BW):
             BWi = BW[i]
 
             if BWi > 0:
-                f_off[i] = np.sum(BW_vect_abs[0:i]) + BWi / 2 - BWtot / 2
                 s_raw = s_raw + smatrix[:, i] * np.exp(
                     1j * 2 * np.pi * (self.Fc_gen + f_off[i]) * t_vect
                 )
@@ -377,7 +344,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
             "Fs": Fs,
         }
 
-        return out, f_off
+        return out
 
     def genMultiQAM(self):
         """Method for generating QAM constellation points based on input bits for multiple carriers.
