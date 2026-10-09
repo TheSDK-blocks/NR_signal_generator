@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from functools import cached_property
 
+import numpy as np
+
 from . import constellation
 from . import grid
 from . import numerology
@@ -19,8 +21,9 @@ class Carrier:
         Channel bandwidth in Hz
     mu : integer
         Numerology
-    n_symb : integer
-        Number of OFDM symbols
+    duration : float
+        Signal duration in seconds, a multiple of a half subframe (0.5 ms);
+        see numerology.duration
     qam : string
         Modulation of the data resource elements
     offset : float
@@ -37,7 +40,7 @@ class Carrier:
     fr: str
     bw: float
     mu: int
-    n_symb: int
+    duration: float
     qam: str
     offset: float = 0.0
     bwp_start: int = 0
@@ -45,8 +48,9 @@ class Carrier:
     n_id_cell: int = 0
 
     def __post_init__(self):
-        if self.n_symb < 1:
-            raise ValueError(f"carrier needs at least one OFDM symbol, got {self.n_symb}")
+        half_subframes = self.duration / 0.5e-3
+        if half_subframes < 1 or not np.isclose(half_subframes, np.round(half_subframes), rtol=0, atol=1e-9):
+            raise ValueError(f"duration {self.duration * 1e3:g} ms is not a multiple of 0.5 ms")
         if self.qam not in constellation.BITS_PER_SYMBOL:
             raise ValueError(f"unsupported modulation {self.qam!r}")
         if self.bwp_size is None:
@@ -83,6 +87,11 @@ class Carrier:
         Array of n_symb cyclic prefix lengths in samples.
         """
         return numerology.nr_cp_lengths(self.n_symb, self.mu, self.parameters(osr))
+
+    @cached_property
+    def n_symb(self):
+        """Number of OFDM symbols, 7 * 2^mu per half subframe."""
+        return 7 * 2**self.mu * int(np.round(self.duration / 0.5e-3))
 
     @cached_property
     def n_rb(self):

@@ -69,7 +69,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
 
         self.IOS.Members["out"] = IO()  # Pointer for output data
 
-        self.carriers = [carrier.Carrier("FR1", 100e6, 1, 7, "64QAM")]
+        self.carriers = [carrier.Carrier("FR1", 100e6, 1, 0.5e-3, "64QAM")]
         self.osr = 1
         self.in_bits = np.array(["max"])
 
@@ -267,7 +267,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
             self.testvar = s
             if self.tx_filter:
                 s = filters.nr_filter(s, Fs, c.bw, c.fr)
-            smatrix[0 : len(s), i] = self.normalize(s, "max")
+            smatrix[:, i] = self.normalize(s, "max")
 
         s_raw = np.zeros(len(smatrix), complex)
 

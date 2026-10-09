@@ -7,7 +7,7 @@ from plot_PSD import plot_PSD
 from . import NR_signal_generator
 from .carrier import Carrier
 
-carriers = [Carrier("FR1", 100e6, 1, 7, "64QAM")]
+carriers = [Carrier("FR1", 100e6, 1, 0.5e-3, "64QAM")]
 in_bits = ["max"] * len(carriers)
 osr = 1
 

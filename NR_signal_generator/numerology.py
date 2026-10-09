@@ -257,3 +257,31 @@ def nominal_spacing(fr, bw1, bw2, raster):
     gb2 = guard_band(fr, mu0, bw2)
     total = bw1 + bw2 - 2 * abs(gb1 - gb2)
     return np.floor(total / (2 * step)) * step
+
+
+def duration(n_symb, mu):
+    """
+    Return the duration of the first n_symb OFDM symbols of numerology mu,
+    including their cyclic prefixes (TS 38.211, Sections 4.1 and 5.3.1).
+
+        T_symb(l) = (2048 + 144) kappa 2^-mu T_c + 16 kappa T_c  if l mod (7 * 2^mu) = 0
+                    (2048 + 144) kappa 2^-mu T_c                 otherwise
+
+    with T_c = 1 / (480 kHz * 4096) and kappa = 64.
+
+    Parameters
+    ----------
+    n_symb : integer
+        Number of OFDM symbols
+    mu : integer
+        5G NR numerology
+
+    Returns
+    -------
+    Duration in seconds.
+    """
+    kappa = 64
+    t_c_per_second = 480e3 * 4096
+    n_long = len(range(0, n_symb, 7 * 2**mu))
+    length = n_symb * (2048 + 144) * kappa * 2**-mu + n_long * 16 * kappa
+    return length / t_c_per_second

@@ -3,7 +3,6 @@ import dataclasses
 import numpy as np
 
 from . import numerology
-from . import ofdm
 
 
 def contiguous(carriers, raster, center=0.0):
@@ -61,9 +60,16 @@ def plan(carriers, osr):
     Raises
     ------
     ValueError
-        If the transmission bandwidths of two carriers overlap, or if a
-        carrier offset does not keep the signal period cyclic.
+        If the carriers differ in duration, if the transmission bandwidths of
+        two carriers overlap, or if a carrier offset does not keep the signal
+        period cyclic.
     """
+    half_subframes = {int(np.round(c.duration / 0.5e-3)) for c in carriers}
+    if len(half_subframes) > 1:
+        listed = ", ".join(f"{n * 0.5:g}" for n in sorted(half_subframes))
+        raise ValueError(f"carriers must have the same duration, got {listed} ms")
+    period = half_subframes.pop() * 0.5e-3
+
     edges = sorted((c.offset - c.bw_config / 2, c.offset + c.bw_config / 2) for c in carriers)
     for (_, high), (low, _) in zip(edges, edges[1:]):
         if low < high:
@@ -77,12 +83,8 @@ def plan(carriers, osr):
     fs = osr * lcm * np.ceil(2 * half_span / (0.85 * lcm))
 
     osr_carrier = np.array([fs / c.parameters()["Fs"] for c in carriers])
-    length = 0
-    for c, osr_c in zip(carriers, osr_carrier):
-        n = ofdm.symbol_starts(c.cp_lengths(osr_c), c.parameters(osr_c)["NFFT"])[-1]
-        length = max(length, int(n))
+    length = int(np.round(period * fs))
 
-    period = length / fs
     for c in carriers:
         cycles = c.offset * period
         if not np.isclose(cycles, np.round(cycles)):
