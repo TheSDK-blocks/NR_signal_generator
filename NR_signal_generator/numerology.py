@@ -107,7 +107,7 @@ def nr_parameters(fr, mu, bw, osr=1):
         raise ValueError(
             f"carrier of {RB} RBs at mu = {mu} cannot hold the 20 RB SS/PBCH block (TS 38.211, Section 7.4.3.1)"
         )
-    # FFT sizes, the smallest one with at least 10 % oversampling of the
+    # FFT sizes, the smallest one with at most 85 % occupancy of the
     # occupied subcarriers is used
     fft_sizes = (128, 256, 512, 1024, 2048, 4096)
     # Raised-cosine roll-off length per FFT size, chosen to keep EVM < 1 %
@@ -115,7 +115,7 @@ def nr_parameters(fr, mu, bw, osr=1):
 
     n_sc = 12 * RB
     scs = 15e3 * 2**mu
-    nfft = next(n for n in fft_sizes if 0.9 * n >= n_sc)
+    nfft = next(n for n in fft_sizes if 0.85 * n >= n_sc)
     fs = nfft * scs
 
     # Cyclic prefix lengths in samples at fs (TS 38.211, Section 5.3.1)
