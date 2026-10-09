@@ -131,3 +131,27 @@ def nr_parameters(fr, mu, bw, osr=1):
         "Nsc": n_sc,
         "Lroll": l_roll[nfft],
     }
+
+
+def max_bw_config(fr, bw):
+    """
+    Return the largest transmission bandwidth configuration, N_RB * 12 * SCS,
+    of channel bandwidth bw over the SCS of fr (TS 38.104, Table 6.6.3.2-1,
+    Note 2).
+
+    Parameters
+    ----------
+    fr : string ("FR1", "FR2-1")
+        Frequency range
+    bw : float
+        Channel bandwidth in Hz
+
+    Returns
+    -------
+    Transmission bandwidth in Hz.
+    """
+    bw_config = []
+    for mu, n_rb_of_bw in N_RB[fr].items():
+        if bw / 1e6 in n_rb_of_bw:
+            bw_config.append(n_rb_of_bw[bw / 1e6] * 12 * 15e3 * 2**mu)
+    return max(bw_config)

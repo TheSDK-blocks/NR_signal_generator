@@ -531,14 +531,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         mu = BWP[0]
         dl = numerology.nr_parameters(self.FR, mu, BW, osr)
         self.BW_conf.append(dl["RB"] * 12 * 2**mu * 15e3)
-        # ACLR filter: transmission bandwidth configuration of the SCS that
-        # provides the largest one (TS 38.104, Table 6.6.3.2-1, Note 2)
-        bw_config = [
-            n_rb[BW / 1e6] * 12 * 15e3 * 2**m
-            for m, n_rb in numerology.N_RB[self.FR].items()
-            if BW / 1e6 in n_rb
-        ]
-        self.ACLR_BW.append(max(bw_config))
+        self.ACLR_BW.append(numerology.max_bw_config(self.FR, BW))
         N_ID_1 = 0  # physical-layer cell-identity group
         N_ID_2 = 0  # physical-layer identity within the group
         N_ID_cell = 3 * N_ID_1 + N_ID_2  # cell identity
