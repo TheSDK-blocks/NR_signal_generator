@@ -18,6 +18,30 @@ N_RB = {
 }
 
 
+# Minimum guard band in kHz per numerology mu and channel bandwidth in MHz
+# (TS 38.104, Tables 5.3.3-1 and 5.3.3-2)
+GUARD_BAND = {
+    "FR1": {
+        0: {3: 142.5, 5: 242.5, 7: 342.5, 10: 312.5, 15: 382.5, 20: 452.5,
+            25: 522.5, 30: 592.5, 35: 572.5, 40: 552.5, 45: 712.5, 50: 692.5},
+        1: {5: 505, 10: 665, 15: 645, 20: 805, 25: 785, 30: 945, 35: 925,
+            40: 905, 45: 1065, 50: 1045, 60: 825, 70: 965, 80: 925, 90: 885,
+            100: 845},
+        2: {10: 1010, 15: 990, 20: 1330, 25: 1310, 30: 1290, 35: 1630,
+            40: 1610, 45: 1590, 50: 1570, 60: 1530, 70: 1490, 80: 1450,
+            90: 1410, 100: 1370},
+    },
+    "FR2-1": {
+        2: {50: 1210, 100: 2450, 200: 4930},
+        3: {50: 1900, 100: 2420, 200: 4900, 400: 9860},
+    },
+}
+
+# Channel rasters in Hz for which TS 38.104, Section 5.4.1.2 defines the
+# nominal channel spacing
+CHANNEL_RASTERS = {"FR1": (100e3, 15e3), "FR2-1": (60e3,)}
+
+
 def n_rb(fr, mu, bw):
     """
     Return the number of resource blocks of a carrier, N_RB, from
@@ -155,3 +179,81 @@ def max_bw_config(fr, bw):
         if bw / 1e6 in n_rb_of_bw:
             bw_config.append(n_rb_of_bw[bw / 1e6] * 12 * 15e3 * 2**mu)
     return max(bw_config)
+
+
+def guard_band(fr, mu, bw):
+    """
+    Return the minimum guard band of a carrier from TS 38.104,
+    Table 5.3.3-1 (FR1) or Table 5.3.3-2 (FR2-1).
+
+    Parameters
+    ----------
+    fr : string ("FR1", "FR2-1")
+        Frequency range
+    mu : integer
+        5G NR numerology
+    bw : float
+        Channel bandwidth in Hz
+
+    Returns
+    -------
+    Guard band in Hz.
+    """
+    try:
+        return GUARD_BAND[fr][mu][bw / 1e6] * 1e3
+    except KeyError:
+        raise ValueError(
+            f"{bw / 1e6:g} MHz at mu = {mu} is not a {fr} channel bandwidth (TS 38.104, Section 5.3.3)"
+        ) from None
+
+
+def nominal_spacing(fr, bw1, bw2, raster):
+    """
+    Return the nominal channel spacing of two adjacent carriers in intra-band
+    contiguous carrier aggregation (TS 38.104, Section 5.4.1.2).
+
+        spacing = floor((bw1 + bw2 - 2 |GB1 - GB2|) / (2 step)) * step
+
+    step = 300 kHz for a 100 kHz raster, 15 kHz * 2^mu0 for a 15 kHz raster
+    and 60 kHz * 2^(mu0 - 2) for a 60 kHz raster. mu0 is the largest
+    numerology with both channel bandwidths; the guard bands GB are taken at
+    mu0. The spec takes mu0 from the numerologies the operating band
+    supports; this assumes the band supports every numerology of fr. With a
+    15 kHz raster and no common numerology, mu0 = 1.
+
+    Parameters
+    ----------
+    fr : string ("FR1", "FR2-1")
+        Frequency range
+    bw1, bw2 : float
+        Channel bandwidths in Hz
+    raster : float
+        Channel raster of the operating band in Hz, 100e3 or 15e3 in FR1 and
+        60e3 in FR2-1
+
+    Returns
+    -------
+    Nominal channel spacing in Hz.
+    """
+    if raster not in CHANNEL_RASTERS[fr]:
+        raise ValueError(f"{raster / 1e3:g} kHz is not a {fr} channel raster (TS 38.104, Section 5.4.2)")
+
+    common = [mu for mu, gb in GUARD_BAND[fr].items() if bw1 / 1e6 in gb and bw2 / 1e6 in gb]
+    if common:
+        mu0 = max(common)
+    elif raster == 15e3:
+        mu0 = 1
+    else:
+        raise ValueError(f"{bw1 / 1e6:g} and {bw2 / 1e6:g} MHz have no common numerology in {fr}")
+
+    if raster == 100e3:
+        step = 300e3
+    elif raster == 15e3:
+        step = 15e3 * 2**mu0
+    else:
+        step = 60e3 * 2 ** (mu0 - 2)
+
+    gb1 = guard_band(fr, mu0, bw1)
+    gb2 = guard_band(fr, mu0, bw2)
+    total = bw1 + bw2 - 2 * abs(gb1 - gb2)
+    return np.floor(total / (2 * step)) * step
