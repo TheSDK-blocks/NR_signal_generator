@@ -16,11 +16,9 @@ test.carriers = carriers
 test.osr = osr
 test.in_bits = in_bits
 test.run_gen()
-rand = np.random.rand(1000, 2) / 10000
 
-test.IOS.Members["in_dem"].Data = np.vstack([rand, test.IOS.Members["out"].Data])
+test.IOS.Members["in_dem"].Data = test.IOS.Members["out"].Data
 test.run_dem()
-test.run_EVM()
 
 plt.figure()
 plt.plot(test.s_struct["s"][:, 0], test.s_struct["s"][:, 1])
