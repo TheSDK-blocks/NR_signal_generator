@@ -93,7 +93,6 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         self.rx_filter = True  # receive channel-select filter in the analyzer
         self.equalizer = "on"
 
-        self.fil_len = 0  # 100
         self.norm = (
             "max"  # max = normalize I & Q separately, amp = normalize amplitude to one
         )
@@ -285,12 +284,10 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
 
                 v_filt = v_mixed
                 if self.rx_filter:
-                    v_filt, self.fil_len = filters.nr_filter(v_mixed, Fs, BWi, self.FR)
+                    v_filt = filters.nr_filter(v_mixed, Fs, BWi, self.FR)
 
                 if car_return == True:
-                    t2 = (
-                        np.arange(0, len(v_filt)) / self.s_struct["Fs"]
-                    )  # NRfilter changes the array size
+                    t2 = np.arange(0, len(v_filt)) / self.s_struct["Fs"]
                     v_filt = v_filt * np.exp(+1j * 2 * np.pi * carrier_offset * t2)
 
                 a = self.demNRdownlink(s=v_filt, BW=BWi, BWP=BWP[i], osr=osr)
@@ -359,13 +356,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
                 s = out["s"]
                 self.testvar = s
                 if self.tx_filter:
-                    s = np.pad(s, (0, (int(slength) - len(s))), constant_values=0)
-                    s, self.fil_len = filters.nr_filter(s, Fs, BWi, self.FR)
-                if len(s) > len(smatrix):
-                    zeros_matrix = np.zeros(
-                        (len(s) - len(smatrix), np.shape(smatrix)[1])
-                    )
-                    smatrix = np.vstack([smatrix, zeros_matrix])
+                    s = filters.nr_filter(s, Fs, BWi, self.FR)
                 smatrix[0 : len(s), i] = self.normalize(x=s, opt="max", k=1)
             else:
                 cnstlmatrix.append([])
@@ -629,9 +620,6 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         osr = kwargs.get("osr")
 
         equalize = self.equalizer
-        # if self.fil=="on":
-
-        #    #sign=self.NRfilter(sign,BW,osr)
         mu = BWP[0]
         N_symb_TOT = int(BWP[1])
 
@@ -641,8 +629,6 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         starts = ofdm.symbol_starts(ncp, dl["NFFT"])
         sign = s
         N_sampl = len(s)
-        # if self.fil=="on":
-        #    sign=self.NRfilter(mu,sign,BW,osr)
         N_slots = np.floor(N_symb_TOT / 14)  # number of slots (integer)
         N_ID_1 = 0  # physical-layer cell-identity group
         N_ID_2 = 0  # physical-layer identity within the group
