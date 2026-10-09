@@ -53,6 +53,8 @@ class Carrier:
             raise ValueError(f"duration {self.duration * 1e3:g} ms is not a multiple of 0.5 ms")
         if self.qam not in constellation.BITS_PER_SYMBOL:
             raise ValueError(f"unsupported modulation {self.qam!r}")
+        if not 0 <= self.n_id_cell <= 1007:
+            raise ValueError(f"cell identity must be 0 to 1007 (TS 38.211, Section 7.4.2.1), got {self.n_id_cell}")
         if self.bwp_size is None:
             object.__setattr__(self, "bwp_size", self.n_rb - self.bwp_start)
         # Building the data mask checks fr, mu, bw and the BWP
@@ -106,19 +108,26 @@ class Carrier:
     @cached_property
     def data_mask(self):
         """Data resource elements, as grid.data_re_mask."""
-        return grid.data_re_mask(self.n_rb, self.n_symb, self.bwp_start, self.bwp_size)
+        mask = grid.data_re_mask(self.n_rb, self.n_symb, self.bwp_start, self.bwp_size)
+        mask.flags.writeable = False
+        return mask
 
     @cached_property
     def pilot_mask(self):
         """DMRS resource elements, as grid.dmrs_mask."""
-        return grid.dmrs_mask(self.n_rb, self.n_symb, self.bwp_start, self.bwp_size)
+        mask = grid.dmrs_mask(self.n_rb, self.n_symb, self.bwp_start, self.bwp_size)
+        mask.flags.writeable = False
+        return mask
 
     @cached_property
     def reference_grid(self):
         """DMRS and PSS values and positions, as grid.reference_grid."""
-        return grid.reference_grid(
+        values, is_ref = grid.reference_grid(
             self.n_rb, self.n_symb, self.mu, self.bwp_start, self.bwp_size, self.n_id_cell, self.n_id_2
         )
+        values.flags.writeable = False
+        is_ref.flags.writeable = False
+        return values, is_ref
 
     @cached_property
     def n_bits(self):

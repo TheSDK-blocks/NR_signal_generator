@@ -60,10 +60,14 @@ def plan(carriers, osr):
     Raises
     ------
     ValueError
-        If the carriers differ in duration, if the transmission bandwidths of
-        two carriers overlap, or if a carrier offset does not keep the signal
-        period cyclic.
+        If the carriers differ in frequency range or duration, if the
+        transmission bandwidths of two carriers overlap, or if a carrier offset
+        does not keep the signal period cyclic.
     """
+    frequency_ranges = {c.fr for c in carriers}
+    if len(frequency_ranges) > 1:
+        raise ValueError(f"carriers must be in the same frequency range, got {', '.join(sorted(frequency_ranges))}")
+
     half_subframes = {int(np.round(c.duration / 0.5e-3)) for c in carriers}
     if len(half_subframes) > 1:
         listed = ", ".join(f"{n * 0.5:g}" for n in sorted(half_subframes))
