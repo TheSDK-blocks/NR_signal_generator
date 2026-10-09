@@ -172,6 +172,10 @@ def data_symbols(re_grid, mask):
     data_symbols(re_grid, data_re_mask(n_rb=51, n_symb=14, bwp_start=0, bwp_size=51))
 
     """
+    if np.shape(re_grid) != mask.shape:
+        raise ValueError(
+            f"grid of shape {np.shape(re_grid)} does not match the data mask of shape {mask.shape}"
+        )
     return re_grid.T[mask.T]
 
 
@@ -192,6 +196,10 @@ def map_data(re_grid, mask, symbols):
     -------
     Complex array of shape (Nsc, Nsymb).
     """
+    if np.shape(re_grid) != mask.shape:
+        raise ValueError(
+            f"grid of shape {np.shape(re_grid)} does not match the data mask of shape {mask.shape}"
+        )
     l, k = np.nonzero(mask.T)
     if len(symbols) > len(k):
         raise ValueError(f"{len(symbols)} data symbols do not fit {len(k)} data resource elements")
