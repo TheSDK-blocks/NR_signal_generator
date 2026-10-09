@@ -38,6 +38,7 @@ from . import constellation
 from . import equalizer
 from . import filters
 from . import grid
+from . import measurements
 from . import numerology
 from . import ofdm
 from . import sequences
@@ -698,38 +699,4 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         mask = grid.data_re_mask(dl["RB"], N_symb, BWP[2], BWP[3])
         rxDataSymbols_nzero = grid.data_symbols(dem, mask).reshape(-1, 1)
         refDataSymbols_nzero = grid.data_symbols(cnstl, mask).reshape(-1, 1)
-        # normalize constellation powers
-        rxDataSymbols = self.normalize(x=rxDataSymbols_nzero, opt="pow", k=1)
-        refDataSymbols = self.normalize(x=refDataSymbols_nzero, opt="pow", k=1)
-        # rxDataSymbols = rxDataSymbols_nzero
-        # refDataSymbols = refDataSymbols_nzero
-
-        # calculate EVM using Matlab's built-in functions
-        # Copied from https://github.com/TheSDK-blocks/f2_testbench/blob/master/f2_testbench/analyzers_mixin.py
-
-        reference = refDataSymbols
-        received = rxDataSymbols
-
-        # Takes zeros into account
-        pad = np.zeros(np.shape(received), complex)
-        pad[: np.shape(reference)[0], : np.shape(reference)[1]] = reference
-        reference = pad
-
-        # Do not take zeros into account
-        # received=np.delete(received,range(len(reference),len(received)))
-
-        # Shape the vectors: time is row observation is column
-        reference.shape = (-1, 1)
-        received.shape = (-1, 1)
-
-        # RMS for Scaling
-        rmsref = np.std(reference)
-        rmsreceived = np.std(received)
-        EVM = (
-            np.mean(
-                np.mean(np.abs(received - reference) ** 2, axis=0)
-                / np.mean(np.abs(reference) ** 2, axis=0)
-            )
-        ) ** (1 / 2)
-
-        return EVM, rxDataSymbols
+        return measurements.evm(refDataSymbols_nzero, rxDataSymbols_nzero)
