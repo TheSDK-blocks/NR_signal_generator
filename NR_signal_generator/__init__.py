@@ -147,9 +147,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         self.dem = self.demMultiNRdownlink(
             car_return=car_return, sig_offset=sig_offset, NR_car_id=NR_car_id
         )
-        self.dem_bits, self.dem_cnstl_vec, self.data_mask = self.MultiQAMtoBit(
-            NR_car_id=NR_car_id
-        )
+        self.dem_bits, self.dem_cnstl_vec = self.MultiQAMtoBit(NR_car_id=NR_car_id)
 
     def run_EVM(self, **kwargs):
         NR_car_id = kwargs.get("NR_car_id", -1)
@@ -199,19 +197,16 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         BWP = self.BWP
         bits = []
         dem_cnstl_vec = []
-        masks = []
         for i in range(0, len(dem)):
             if BW[i] > 0 and (NR_car_id == -1 or i == NR_car_id):
-                temp1, temp2, mask = self.QAMtoBit(cnstl=dem[i], BW=BW[i], BWP=BWP[i])
+                temp1, temp2 = self.QAMtoBit(cnstl=dem[i], BW=BW[i], BWP=BWP[i])
                 bits.append(temp1)
                 dem_cnstl_vec.append(temp2)
-                masks.append(mask)
             else:
                 bits.append(np.array([]))
                 dem_cnstl_vec.append(np.array([]))
-                masks.append(np.array([]))
 
-        return bits, dem_cnstl_vec, masks
+        return bits, dem_cnstl_vec
 
     def measMultiEVMdownlink(self, **kwargs):
         """Method for calculating EVM based on generated constellation points and recieved constellation points for multiple carriers.
@@ -225,7 +220,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         NR_car_id = kwargs.get("NR_car_id", -1)
 
         BW = self.BW
-        cnstl = self.s_struct["cnstl"]
+        cnstl = self.cnstl
 
         N_BW = len(cnstl)
         EVM = []
@@ -233,9 +228,9 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         # measure EVM separately for each constellation
         for i in range(0, N_BW):
             if BW[i] > 0 and (NR_car_id == -1 or i == NR_car_id):
-                EVM1, rxDataSymbols1 = self.measEVMdownlink(
-                    cnstl[i], self.dem_cnstl_vec[i], self.data_mask[i]
-                )
+                # reference: the transmitted symbols, in the order they are mapped
+                reference = cnstl[i].reshape(-1, 1)
+                EVM1, rxDataSymbols1 = measurements.evm(reference, self.dem_cnstl_vec[i])
                 rxDataSymbols.append(rxDataSymbols1)
                 EVM.append(EVM1)
             else:
@@ -427,7 +422,11 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         Parameters
         ----------
         bits : array of binary values
-           Binary input data
+           Binary input data that exactly fill every data resource element of
+           the BWP, or "max" for pseudorandom bits. "max" stands in for MAC
+           padding and scrambling and is seeded from carrier_id and signal_id,
+           so it is reproducible. User data shorter than the allocation must be
+           padded by the caller, e.g. with pseudorandom bits.
         BW : integer
             Bandwidth of carrier
         BWP : array of certain structure
@@ -450,13 +449,17 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         dl = numerology.nr_parameters(self.FR, BWP[0], BW)
         Nsymb = int(BWP[1])
         Ncnstl = int(grid.data_re_mask(dl["RB"], Nsymb, BWP[2], BWP[3]).sum())
+        m = constellation.BITS_PER_SYMBOL[qam_type]
 
-        if bits == "max":
+        if isinstance(bits, str) and bits == "max":
             seed = (carrier_id + self.signal_id * 13 + 1) * 123
             rng = np.random.RandomState(seed)
-            bits = rng.randint(2, size=constellation.BITS_PER_SYMBOL[self.QAM] * Ncnstl)
+            bits = rng.randint(2, size=m * Ncnstl)
+        elif len(bits) != m * Ncnstl:
+            raise ValueError(
+                f"carrier {carrier_id}: {len(bits)} bits do not fill the {m * Ncnstl}-bit allocation"
+            )
 
-        m = constellation.BITS_PER_SYMBOL[qam_type]
         return constellation.modulate(bits, qam_type), np.reshape(bits, (-1, m))
 
     def QAMtoBit(self, **kwargs):
@@ -494,7 +497,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         mask = grid.data_re_mask(dl["RB"], Nsymb, BWP[2], BWP[3])
         DataSymbols_nzero = grid.data_symbols(cnstl, mask).reshape(-1, 1)
         vector = constellation.demodulate(DataSymbols_nzero.flatten(), qam_type)
-        return vector, DataSymbols_nzero, mask
+        return vector, DataSymbols_nzero
 
     def genNRdownlink(self, **kwargs):
         """Method for generating 5G NR signal based on constellation points.
@@ -629,23 +632,3 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         pilots = grid.dmrs_mask(dl["RB"], N_symb_TOT, BWP[2], BWP[3])
 
         return equalizer.equalize(RE, RE_id, pilots)
-
-    def measEVMdownlink(self, cnstl, rx, mask):
-        """
-        Return the EVM of received data symbols against a reference grid.
-
-        Parameters
-        ----------
-        cnstl : array
-            Generated resource-element grid used as reference
-        rx : array
-            Received data symbols, as returned by QAMtoBit
-        mask : array of bool
-            Data resource elements of the grid, as returned by QAMtoBit
-
-        Returns
-        -------
-        EVM as a fraction, and the received data symbols normalised to unit power.
-        """
-        refDataSymbols_nzero = grid.data_symbols(cnstl, mask).reshape(-1, 1)
-        return measurements.evm(refDataSymbols_nzero, rx)
