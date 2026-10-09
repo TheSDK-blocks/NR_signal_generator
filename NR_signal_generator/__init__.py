@@ -229,8 +229,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         for i in range(0, N_BW):
             if BW[i] > 0 and (NR_car_id == -1 or i == NR_car_id):
                 # reference: the transmitted symbols, in the order they are mapped
-                reference = cnstl[i].reshape(-1, 1)
-                EVM1, rxDataSymbols1 = measurements.evm(reference, self.dem_cnstl_vec[i])
+                EVM1, rxDataSymbols1 = measurements.evm(cnstl[i], self.dem_cnstl_vec[i])
                 rxDataSymbols.append(rxDataSymbols1)
                 EVM.append(EVM1)
             else:
@@ -495,8 +494,8 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         N_ID_cell = 3 * N_ID_1 + N_ID_2  # cell identity
         Nsymb = int(BWP[1])
         mask = grid.data_re_mask(dl["RB"], Nsymb, BWP[2], BWP[3])
-        DataSymbols_nzero = grid.data_symbols(cnstl, mask).reshape(-1, 1)
-        vector = constellation.demodulate(DataSymbols_nzero.flatten(), qam_type)
+        DataSymbols_nzero = grid.data_symbols(cnstl, mask)
+        vector = constellation.demodulate(DataSymbols_nzero, qam_type)
         return vector, DataSymbols_nzero
 
     def genNRdownlink(self, **kwargs):

@@ -19,6 +19,8 @@ def evm(reference, received):
     -------
     EVM as a fraction, and the received symbols r normalised to unit power.
     """
+    if np.shape(reference) != np.shape(received):
+        raise ValueError(f"reference shape {np.shape(reference)} does not match received shape {np.shape(received)}")
     reference = reference / np.sqrt(np.mean(np.abs(reference) ** 2))
     received = received / np.sqrt(np.mean(np.abs(received) ** 2))
     error = np.mean(np.abs(received - reference) ** 2) / np.mean(np.abs(reference) ** 2)
