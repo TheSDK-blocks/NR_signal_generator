@@ -29,25 +29,21 @@ if not (os.path.abspath("../../thesdk") in sys.path):
 
 from thesdk import *
 
-import pdb
 import numpy as np
-import matplotlib.pyplot as plt
-from plot_PSD import plot_PSD
 
 from . import analyzer
 from . import carrier
 from . import constellation
 from . import generator
 from . import multicarrier
-from . import sequences
 
 
-class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
+class NR_signal_generator(thesdk):
     @property
     def _classfile(self):
         return os.path.dirname(os.path.realpath(__file__)) + "/" + __name__
 
-    def __init__(self, *arg):  # ,BW,osr,Nsymb,qam_type,bits
+    def __init__(self, *arg):
 
         self.print_log(type="I", msg="Inititalizing %s" % (__name__))
 
@@ -69,14 +65,10 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         self.osr = 1
         self.in_bits = np.array(["max"])
 
-        self.seed = 0
         self.include_time_vector = 0
 
         self.model = "py"
         # Can be set externally, but is not propagated
-        self.par = False  # By default, no parallel processingi
-        self.queue = []  # By default, no parallel processing
-        self.IOS.Members["control_write"] = IO()
         self.tx_filter = True  # transmit channel filter in the generator
         self.rx_filter = True  # receive channel-select filter in the analyzer
 

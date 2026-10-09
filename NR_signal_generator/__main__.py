@@ -1,5 +1,3 @@
-import pdb
-import numpy as np
 import matplotlib.pyplot as plt
 
 from plot_PSD import plot_PSD
@@ -33,6 +31,5 @@ for i in range(0, len(carriers)):
     plt.title("Carrier " + str(i + 1))
     plt.show(block=False)
 
-a = plot_PSD(signal=test.s_struct["s"][:, 1], Fs=test.s_struct["Fs"])
-
-pdb.set_trace()
+plot_PSD(signal=test.s_struct["s"][:, 1], Fs=test.s_struct["Fs"])
+plt.show()

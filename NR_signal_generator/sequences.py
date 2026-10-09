@@ -89,7 +89,6 @@ def dmrs(N_ID_cell, Nsymb, RB):
         # create reference-signal sequence
         ones = np.ones(int(len(c) / 2))
         a = np.reshape(np.array(c), (-1, 2))
-        b = a[0, :]
         r[:, i] = np.add(
             (1 / (np.sqrt(2))) * np.subtract(ones, 2 * a[:, 0]),
             1j * (1 / (np.sqrt(2))) * np.subtract(ones, 2 * a[:, 1]),
