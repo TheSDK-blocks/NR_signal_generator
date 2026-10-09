@@ -363,7 +363,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
                 self.testvar = s
                 if self.tx_filter:
                     s = filters.nr_filter(s, Fs, BWi, self.FR)
-                smatrix[0 : len(s), i] = self.normalize(x=s, opt="max", k=1)
+                smatrix[0 : len(s), i] = self.normalize(s, "max")
             else:
                 cnstlmatrix.append([])
 
@@ -381,12 +381,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
                 s_raw = s_raw + smatrix[:, i] * np.exp(
                     1j * 2 * np.pi * (self.Fc_gen + f_off[i]) * t_vect
                 )
-        if self.norm == "max":
-            s = self.normalize(x=s_raw, opt="max", k=1)  # normalize final signal to 1
-        elif self.norm == "amp":
-            s = self.normalize(x=s_raw, opt="amp", k=1)  # normalize final signal to 1
-
-        # s=s_raw
+        s = self.normalize(s_raw, self.norm)
         output_format = np.transpose(np.vstack((t_vect, np.real(s), np.imag(s))))
         out = {
             "s": output_format,
@@ -546,56 +541,29 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
 
         return out
 
-    def normalize(self, **kwargs):
-        """Method for normalizing signal.
+    def normalize(self, x, opt):
+        """
+        Return x scaled to a peak of one.
 
         Parameters
         ----------
         x : array
-           Signal
-        opt : sting
-            Normalization option (max, pow)
-        k : float
-            Input is normalized to this value
-            - if option = "max", then max(|Re(yi)|, |Im(yi)|) = k
-            - if option = "pow" or "totpow", then the statistical power of y  is k^2
+            Complex signal
+        opt : string ("max", "amp")
+            "max" scales max(|Re(x)|, |Im(x)|) to one, "amp" scales max(|x|) to one
 
-        Example
+        Returns
         -------
-        self.normalize(x=[0.3,...,0.7], opt="max",k=1)
-
+        Scaled signal.
         """
-
-        x = kwargs.get("x")
-        opt = kwargs.get("opt")
-        k = kwargs.get("k")
-
-        # INPUTS:
-        # x = input vector or matrix
-        # opt = can be either "max", "pow", or "totpow"
-        # k = input is normalized to this factor
-        #     - if option = "max", then max(|Re(yi)|, |Im(yi)|) = k
-        #     - if option = "pow" or "totpow", then the statistical power of y (or
-        #       each of its columns) is k^2
         if opt == "max":
-            test_matrix = np.concatenate(
-                (np.absolute(np.real(x)), np.absolute(np.imag(x)))
-            )
-            max_value = test_matrix.max()
-            y = k * x / max_value
-
+            parts = np.concatenate((np.abs(x.real), np.abs(x.imag)))
+            peak = parts.max()
         elif opt == "amp":
-            amp = np.sqrt((np.real(x) ** 2) + (np.imag(x) ** 2))
-            max_amp = max(amp)
-            y = k * x / max_amp
-
-        elif opt == "pow":
-            pow = (np.absolute(x) ** 2).sum() / len(x)
-            y = k * x / np.sqrt(pow)
-
-        elif opt == "totpow":
-            """TBD if needed"""
-        return y
+            peak = np.abs(x).max()
+        else:
+            raise ValueError(f'normalization must be "max" or "amp", got {opt}')
+        return x / peak
 
     def demNRdownlink(self, **kwargs):
         """Method for demodulation signal.
