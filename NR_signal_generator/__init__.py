@@ -38,6 +38,7 @@ from . import carrier
 from . import constellation
 from . import equalizer
 from . import filters
+from . import generator
 from . import grid
 from . import measurements
 from . import multicarrier
@@ -96,8 +97,19 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
             self.parent = parent
 
     def main_gen(self):
-        self.cnstl, self.gen_bits = self.genMultiQAM(self.carriers)
-        self.s_struct = self.genMultiNRdownlink(self.carriers)
+        bits = []
+        for b in self.in_bits:
+            if isinstance(b, str) and b == "max":
+                bits.append(None)
+            else:
+                bits.append(b)
+        x, self.cnstl = generator.generate(self.carriers, self.osr, self.tx_filter, bits, self.signal_id)
+        self.gen_bits = [constellation.demodulate(s, c.qam) for c, s in zip(self.carriers, self.cnstl)]
+
+        Fs = multicarrier.plan(self.carriers, self.osr)["Fs"]
+        s = self.normalize(x, self.norm)
+        t = np.arange(len(s)) / Fs
+        self.s_struct = {"s": np.transpose(np.vstack((t, np.real(s), np.imag(s)))), "Fs": Fs}
         if self.include_time_vector == 1:
             self.IOS.Members["out"].Data = self.s_struct[
                 "s"
@@ -245,99 +257,6 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
                 cnstl.append(np.array([]))
         return cnstl
 
-    def genMultiNRdownlink(self, carriers):
-        """Method for generating signal from constellation points for multiple carriers.
-
-
-        Example
-        -------
-        self.genMultiNRdownlink()
-
-        """
-
-        cnstl = self.cnstl
-        plan = multicarrier.plan(carriers, self.osr)
-        Fs = plan["Fs"]
-        osr = plan["osr"]
-
-        smatrix = np.zeros((plan["length"], len(carriers)), complex)
-        # generate carriers
-        for i, c in enumerate(carriers):
-            s = self.genNRdownlink(c, osr[i], cnstl[i])
-            self.testvar = s
-            if self.tx_filter:
-                s = filters.nr_filter(s, Fs, c.bw, c.fr)
-            smatrix[:, i] = s * np.sqrt(c.mean_square / np.mean(np.abs(s) ** 2))
-
-        s_raw = np.zeros(len(smatrix), complex)
-
-        # mix carriers to proper frequency offset
-        t_vect = np.arange(0, len(smatrix)) / Fs
-        for i, c in enumerate(carriers):
-            s_raw = s_raw + smatrix[:, i] * np.exp(1j * 2 * np.pi * c.offset * t_vect)
-        s = self.normalize(s_raw, self.norm)
-        output_format = np.transpose(np.vstack((t_vect, np.real(s), np.imag(s))))
-        out = {
-            "s": output_format,
-            "Fs": Fs,
-        }
-
-        return out
-
-    def genMultiQAM(self, carriers):
-        """
-        Return the data symbols and bits of each carrier.
-
-        Parameters
-        ----------
-        carriers : list of carrier.Carrier
-            Carriers of the signal
-
-        Returns
-        -------
-        Data symbols and bits of each carrier.
-        """
-        cnstl = []
-        gen_bits = []
-        for i, c in enumerate(carriers):
-            a, bit = self.genQAM(i, self.in_bits[i], c)
-            cnstl.append(a)
-            gen_bits.append(bit)
-        return cnstl, gen_bits
-
-    def genQAM(self, carrier_id, bits, c):
-        """
-        Return the data symbols of a carrier and the bits they carry.
-
-        Parameters
-        ----------
-        carrier_id : integer
-            Index of the carrier
-        bits : array of binary values
-           Binary input data that exactly fill every data resource element of
-           the BWP, or "max" for pseudorandom bits. "max" stands in for MAC
-           padding and scrambling and is seeded from carrier_id and signal_id,
-           so it is reproducible. User data shorter than the allocation must be
-           padded by the caller, e.g. with pseudorandom bits.
-        c : carrier.Carrier
-            Carrier
-
-        Returns
-        -------
-        Data symbols, and the bits as an array of one row per symbol.
-        """
-        m = constellation.BITS_PER_SYMBOL[c.qam]
-        if isinstance(bits, str) and bits == "max":
-            seed = (carrier_id + self.signal_id * 13 + 1) * 123
-            rng = np.random.RandomState(seed)
-            bits = rng.randint(2, size=c.n_bits)
-        elif len(bits) != c.n_bits:
-            raise ValueError(
-                f"carrier {carrier_id}: {len(bits)} bits do not fill the {c.n_bits}-bit allocation"
-            )
-
-        return constellation.modulate(bits, c.qam), np.reshape(bits, (-1, m))
-
     def QAMtoBit(self, cnstl, c):
         """
         Return the bits and data symbols of an equalized resource-element grid.
@@ -355,28 +274,6 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         """
         data = grid.data_symbols(cnstl, c.data_mask)
         return constellation.demodulate(data, c.qam), data
-
-    def genNRdownlink(self, c, osr, cnstl):
-        """
-        Return the OFDM signal of a carrier.
-
-        Parameters
-        ----------
-        c : carrier.Carrier
-            Carrier
-        osr : integer
-            Oversampling factor
-        cnstl : array
-            Data symbols of the carrier
-
-        Returns
-        -------
-        Complex baseband signal.
-        """
-        dl = c.parameters(osr)
-        values, is_ref = c.reference_grid
-        RE = grid.map_data(values, c.data_mask, cnstl)
-        return ofdm.modulate(RE, dl["NFFT"], c.cp_lengths(osr), dl["Lroll"] * osr)
 
     def normalize(self, x, opt):
         """

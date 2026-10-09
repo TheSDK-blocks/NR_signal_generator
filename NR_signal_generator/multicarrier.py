@@ -97,3 +97,24 @@ def plan(carriers, osr):
             )
 
     return {"Fs": fs, "osr": osr_carrier, "length": length}
+
+
+def mix(x, fs, f):
+    """
+    Return x shifted in frequency by f.
+
+    Parameters
+    ----------
+    x : array
+        Complex signal
+    fs : float
+        Sample rate in Hz
+    f : float
+        Frequency shift in Hz
+
+    Returns
+    -------
+    Shifted signal.
+    """
+    t = np.arange(len(x)) / fs
+    return x * np.exp(1j * 2 * np.pi * f * t)
