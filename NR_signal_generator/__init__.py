@@ -655,11 +655,10 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
 
         Nsc, N_symb = cnstl.shape  # get some info from constellation matrix dimensions
         mu = BWP[0]
-        if dem.size == 0:
-            return 0, 0
-        Nsc_rx, N_symb_rx = dem.shape
-        if Nsc != Nsc_rx or N_symb != N_symb_rx:
-            return 0, 0
+        if np.shape(dem) != cnstl.shape:
+            raise ValueError(
+                f"received grid of shape {np.shape(dem)} does not match the reference grid of shape {cnstl.shape}"
+            )
         dl = numerology.nr_parameters(self.FR, mu, BW)  # get NR parameters
         N_ID_1 = 0  # physical-layer cell-identity group
         N_ID_2 = 0  # physical-layer identity within the group
