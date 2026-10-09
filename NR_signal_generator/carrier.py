@@ -21,12 +21,15 @@ class Carrier:
         Numerology
     n_symb : integer
         Number of OFDM symbols
-    bwp_start : integer
-        First resource block of the BWP, N_BWP^start
-    bwp_size : integer
-        Number of resource blocks of the BWP, N_BWP^size
     qam : string
         Modulation of the data resource elements
+    offset : float
+        Carrier centre frequency relative to the signal centre in Hz
+    bwp_start : integer
+        First resource block of the BWP, N_BWP^start
+    bwp_size : integer or None
+        Number of resource blocks of the BWP, N_BWP^size, None for the rest of
+        the carrier from bwp_start
     n_id_cell : integer
         Physical-layer cell identity
     """
@@ -35,9 +38,10 @@ class Carrier:
     bw: float
     mu: int
     n_symb: int
-    bwp_start: int
-    bwp_size: int
     qam: str
+    offset: float = 0.0
+    bwp_start: int = 0
+    bwp_size: int = None
     n_id_cell: int = 0
 
     def __post_init__(self):
@@ -45,6 +49,8 @@ class Carrier:
             raise ValueError(f"carrier needs at least one OFDM symbol, got {self.n_symb}")
         if self.qam not in constellation.BITS_PER_SYMBOL:
             raise ValueError(f"unsupported modulation {self.qam!r}")
+        if self.bwp_size is None:
+            object.__setattr__(self, "bwp_size", self.n_rb - self.bwp_start)
         # Building the data mask checks fr, mu, bw and the BWP
         self.data_mask
 

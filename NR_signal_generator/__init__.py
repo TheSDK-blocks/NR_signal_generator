@@ -58,14 +58,10 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         # Properties that can be propagated from parent
         self.proplist = [
             "signal_id",
-            "BW",
-            "BWP",
+            "carriers",
             "osr",
-            "QAM",
             "in_bits",
             "include_time_vector",
-            "Fc_gen",
-            "FR",
         ]
 
         self.IOS = Bundle()
@@ -73,16 +69,12 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
 
         self.IOS.Members["out"] = IO()  # Pointer for output data
 
-        self.BWP = np.array([[1, 7, 0, 273]])
-        self.QAM = "64QAM"
+        self.carriers = [carrier.Carrier("FR1", 100e6, 1, 7, "64QAM")]
         self.osr = 1
-        self.BW = np.array([100e6])
-        self.FR = "FR1"  # frequency range, "FR1" or "FR2-1"
         self.in_bits = np.array(["max"])
 
         self.seed = 0
         self.include_time_vector = 0
-        self.Fc_gen = 0
 
         self.model = "py"
         # Can be set externally, but is not propagated
@@ -104,18 +96,8 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
             self.parent = parent
 
     def main_gen(self):
-        if not hasattr(self.BW, "__len__"):
-            self.BW = np.array([self.BW])
-        if not hasattr(self.BW, "size"):
-            self.BW = np.array([self.BW])
-
-        carriers = self.nr_carriers()
-        self.BW_conf = [c.bw_config for c in carriers if c is not None]
-        self.ACLR_BW = [c.aclr_bw for c in carriers if c is not None]
-        self.cnstl, self.gen_bits = self.genMultiQAM(carriers)
-        if self.Fc_gen != 0:
-            self.osr_based_on_Fc()
-        self.s_struct = self.genMultiNRdownlink(carriers)
+        self.cnstl, self.gen_bits = self.genMultiQAM(self.carriers)
+        self.s_struct = self.genMultiNRdownlink(self.carriers)
         if self.include_time_vector == 1:
             self.IOS.Members["out"].Data = self.s_struct[
                 "s"
@@ -124,13 +106,6 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
             self.IOS.Members["out"].Data = np.transpose(
                 np.vstack((self.s_struct["s"][:, 1], self.s_struct["s"][:, 2]))
             )
-        if len(self.BW_conf) == 1:
-            self.BW_conf = self.BW_conf[0]
-
-        if len(self.ACLR_BW) == 1:
-            self.ACLR_BW = self.ACLR_BW[0]
-        elif len(self.ACLR_BW) == 0:
-            self.ACLR_BW = 0
 
     def run_gen(self, *arg):
         if self.model == "py":
@@ -143,13 +118,10 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         self.rec_sig = self.IOS.Members[
             "in_dem"
         ].Data  # Input signal as matrix descibed in main_gen()
-        if not hasattr(self.BW, "__len__"):
-            self.BW = [self.BW]
-        carriers = self.nr_carriers()
         self.dem = self.demMultiNRdownlink(
-            carriers, car_return=car_return, sig_offset=sig_offset, NR_car_id=NR_car_id
+            self.carriers, car_return=car_return, sig_offset=sig_offset, NR_car_id=NR_car_id
         )
-        self.dem_bits, self.dem_cnstl_vec = self.MultiQAMtoBit(carriers, NR_car_id=NR_car_id)
+        self.dem_bits, self.dem_cnstl_vec = self.MultiQAMtoBit(self.carriers, NR_car_id=NR_car_id)
 
     def run_EVM(self, **kwargs):
         NR_car_id = kwargs.get("NR_car_id", -1)
@@ -171,36 +143,6 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
                 car_return=car_return, sig_offset=sig_offset, NR_car_id=NR_car_id
             )
 
-    def nr_carriers(self):
-        """
-        Return the carriers of the configuration.
-
-        Returns
-        -------
-        List with a carrier.Carrier for each positive entry of BW and None for gaps.
-        """
-        carriers = []
-        for bw, bwp in zip(self.BW, self.BWP):
-            if bw > 0:
-                c = carrier.Carrier(
-                    self.FR, float(bw), int(bwp[0]), int(bwp[1]), int(bwp[2]), int(bwp[3]), self.QAM
-                )
-                carriers.append(c)
-            else:
-                carriers.append(None)
-        return carriers
-
-    def osr_based_on_Fc(self):
-        BW_vect_abs = np.abs(self.BW)
-        BW_tot = np.sum(BW_vect_abs)  # get total bandwidth (in Hz)
-        Fs_estimate = np.ceil(BW_tot / 2)
-        req_fs = self.Fc_gen * 2 + Fs_estimate
-        osr = np.ceil(req_fs / Fs_estimate)
-        if osr == 0:
-            pass
-        else:
-            self.osr = osr
-
     def MultiQAMtoBit(self, carriers, **kwargs):
         """Method for calculate binary data based on recieved constellation points for multiple carriers.
 
@@ -216,7 +158,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         bits = []
         dem_cnstl_vec = []
         for i, c in enumerate(carriers):
-            if c is not None and (NR_car_id == -1 or i == NR_car_id):
+            if NR_car_id == -1 or i == NR_car_id:
                 temp1, temp2 = self.QAMtoBit(dem[i], c)
                 bits.append(temp1)
                 dem_cnstl_vec.append(temp2)
@@ -237,14 +179,12 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
 
         NR_car_id = kwargs.get("NR_car_id", -1)
 
-        BW = self.BW
         cnstl = self.cnstl
 
-        N_BW = len(cnstl)
         EVM = []
         # measure EVM separately for each constellation
-        for i in range(0, N_BW):
-            if BW[i] > 0 and (NR_car_id == -1 or i == NR_car_id):
+        for i in range(0, len(cnstl)):
+            if NR_car_id == -1 or i == NR_car_id:
                 # reference: the transmitted symbols, in the order they are mapped
                 EVM.append(measurements.evm(cnstl[i], self.dem_cnstl_vec[i]))
             else:
@@ -270,11 +210,8 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
         NR_car_id = kwargs.get("NR_car_id", -1)
 
         sign = self.rec_sig
-        BW = self.BW
-        BWP = self.BWP
-        plan = multicarrier.plan(self.FR, BW, BWP, self.osr)
+        plan = multicarrier.plan(carriers, self.osr)
         Fs = plan["Fs"]
-        f_off = plan["f_off"]
         cnstl = []
         # t=np.arange(0,sign.size)/Fs # initialize time vector (for mixing)
         if sign.shape[1] == 2:
@@ -285,13 +222,13 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
             s = sign[:, 1] + 1j * sign[:, 2]
         # demodulate carriers
         for i, c in enumerate(carriers):
-            if c is not None and (NR_car_id == -1 or i == NR_car_id):
+            if NR_car_id == -1 or i == NR_car_id:
 
                 # mix current carrier so that it is centered at 0 Hz
                 if car_return == False:
-                    v_mixed = s * np.exp(-1j * 2 * np.pi * (self.Fc_gen + f_off[i]) * t)
+                    v_mixed = s * np.exp(-1j * 2 * np.pi * c.offset * t)
                 else:
-                    carrier_offset = self.Fc_gen + f_off[i] + sig_offset
+                    carrier_offset = c.offset + sig_offset
                     v_mixed = s * np.exp(-1j * 2 * np.pi * carrier_offset * t)
 
                 v_filt = v_mixed
@@ -318,34 +255,26 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
 
         """
 
-        BW = self.BW
-        BWP = self.BWP
         cnstl = self.cnstl
-        N_BW = BW.size
-        plan = multicarrier.plan(self.FR, BW, BWP, self.osr)
+        plan = multicarrier.plan(carriers, self.osr)
         Fs = plan["Fs"]
         osr = plan["osr"]
-        f_off = plan["f_off"]
 
-        smatrix = np.zeros((plan["length"], int(N_BW)), complex)
+        smatrix = np.zeros((plan["length"], len(carriers)), complex)
         # generate carriers
         for i, c in enumerate(carriers):
-            if c is not None:
-                s = self.genNRdownlink(c, osr[i], cnstl[i])
-                self.testvar = s
-                if self.tx_filter:
-                    s = filters.nr_filter(s, Fs, c.bw, c.fr)
-                smatrix[0 : len(s), i] = self.normalize(s, "max")
+            s = self.genNRdownlink(c, osr[i], cnstl[i])
+            self.testvar = s
+            if self.tx_filter:
+                s = filters.nr_filter(s, Fs, c.bw, c.fr)
+            smatrix[0 : len(s), i] = self.normalize(s, "max")
 
         s_raw = np.zeros(len(smatrix), complex)
 
         # mix carriers to proper frequency offset
         t_vect = np.arange(0, len(smatrix)) / Fs
         for i, c in enumerate(carriers):
-            if c is not None:
-                s_raw = s_raw + smatrix[:, i] * np.exp(
-                    1j * 2 * np.pi * (self.Fc_gen + f_off[i]) * t_vect
-                )
+            s_raw = s_raw + smatrix[:, i] * np.exp(1j * 2 * np.pi * c.offset * t_vect)
         s = self.normalize(s_raw, self.norm)
         output_format = np.transpose(np.vstack((t_vect, np.real(s), np.imag(s))))
         out = {
@@ -361,23 +290,19 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
 
         Parameters
         ----------
-        carriers : list
-            carrier.Carrier of each entry of BW, None for gaps
+        carriers : list of carrier.Carrier
+            Carriers of the signal
 
         Returns
         -------
-        Data symbols and bits of each carrier, empty for gaps.
+        Data symbols and bits of each carrier.
         """
         cnstl = []
         gen_bits = []
         for i, c in enumerate(carriers):
-            if c is None:
-                cnstl.append([])
-                gen_bits.append([])
-            else:
-                a, bit = self.genQAM(i, self.in_bits[i], c)
-                cnstl.append(a)
-                gen_bits.append(bit)
+            a, bit = self.genQAM(i, self.in_bits[i], c)
+            cnstl.append(a)
+            gen_bits.append(bit)
         return cnstl, gen_bits
 
     def genQAM(self, carrier_id, bits, c):
