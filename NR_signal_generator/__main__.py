@@ -69,7 +69,7 @@ elif hasattr(BW, "__len__"):
     for i in range(0, BW.size):
         if np.size(test.EVM[i]) and test.EVM[i] != 0:
             plt.figure()
-            plt.plot(test.rxDataSymbols[i].real, test.rxDataSymbols[i].imag, "o")
+            plt.plot(test.dem_cnstl_vec[i].real, test.dem_cnstl_vec[i].imag, "o")
             plt.plot(test.cnstl[i].real, test.cnstl[i].imag, "o")
             plt.title("Carrier " + str(i + 1))
             plt.show(block=False)

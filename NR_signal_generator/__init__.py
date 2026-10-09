@@ -156,7 +156,7 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
 
     def main_EVM(self, **kwargs):
         NR_car_id = kwargs.get("NR_car_id", -1)
-        self.EVM, self.rxDataSymbols = self.measMultiEVMdownlink(NR_car_id=NR_car_id)
+        self.EVM = self.measMultiEVMdownlink(NR_car_id=NR_car_id)
 
     def run_dem(self, *arg, **kwargs):
         car_return = kwargs.get(
@@ -224,18 +224,14 @@ class NR_signal_generator(thesdk):  # rtl,eldo,thesdk
 
         N_BW = len(cnstl)
         EVM = []
-        rxDataSymbols = []
         # measure EVM separately for each constellation
         for i in range(0, N_BW):
             if BW[i] > 0 and (NR_car_id == -1 or i == NR_car_id):
                 # reference: the transmitted symbols, in the order they are mapped
-                EVM1, rxDataSymbols1 = measurements.evm(cnstl[i], self.dem_cnstl_vec[i])
-                rxDataSymbols.append(rxDataSymbols1)
-                EVM.append(EVM1)
+                EVM.append(measurements.evm(cnstl[i], self.dem_cnstl_vec[i]))
             else:
-                rxDataSymbols.append(np.array([]))
                 EVM.append(np.array([]))
-        return EVM, rxDataSymbols
+        return EVM
 
     def demMultiNRdownlink(self, **kwargs):
         """Method for demodulate constellation points from recieved signal for multiple carriers.
