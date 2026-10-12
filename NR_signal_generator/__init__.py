@@ -31,11 +31,11 @@ from thesdk import *
 
 import numpy as np
 
-from . import analyzer
-from . import carrier
-from . import constellation
-from . import generator
-from . import multicarrier
+from nr_signal_utils import analyzer
+from nr_signal_utils import carrier
+from nr_signal_utils import constellation
+from nr_signal_utils import generator
+from nr_signal_utils import multicarrier
 
 
 class NR_signal_generator(thesdk):
