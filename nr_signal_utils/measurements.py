@@ -116,7 +116,8 @@ def aclr(f, p, carriers, aclr_offset=0):
     Parameters
     ----------
     f : array
-        Frequencies in Hz in ascending order, as returned by spectrum.psd
+        Frequencies in Hz in ascending order of the two-sided spectrum, as
+        returned by spectrum.psd
     p : array
         Power spectral density, as returned by spectrum.psd
     carriers : list of carrier.Carrier
@@ -130,10 +131,23 @@ def aclr(f, p, carriers, aclr_offset=0):
     "k" and "channel" as in aclr_channels, the level of the channel relative
     to the carrier's own channel "aclr" in dB, and relative to the highest
     spectral density "level" in dB.
+
+    Raises
+    ------
+    ValueError
+        If a channel extends past the Nyquist frequency.
     """
+    nyquist = abs(f[0])
     peak = max(p)
     result = []
     for i, k, channel in aclr_channels(f, carriers, aclr_offset):
+        low = channel.center - channel.width / 2
+        high = channel.center + channel.width / 2
+        if low < -nyquist or high > nyquist:
+            raise ValueError(
+                f"channel {k} of carrier {i} from {low / 1e6:g} to {high / 1e6:g} MHz "
+                f"extends past the Nyquist frequency {nyquist / 1e6:g} MHz"
+            )
         own = spectrum.Channel(carriers[i].offset, carriers[i].bw_config)
         reference = spectrum.band_level(f, p, own)
         level = spectrum.band_level(f, p, channel)
