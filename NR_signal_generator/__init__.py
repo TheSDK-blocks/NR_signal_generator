@@ -119,7 +119,7 @@ class NR_signal_generator(thesdk):
             y, self.cnstl, self.carriers, self.osr, self.rx_filter
         )
         Fs = multicarrier.plan(self.carriers, self.osr)["Fs"]
-        self.psd = spectrum.psd(y, Fs, onesided=False)
+        self.psd = spectrum.psd(y, Fs)
         self.ACLR = measurements.aclr(*self.psd, self.carriers)
 
     def run_dem(self, *arg):

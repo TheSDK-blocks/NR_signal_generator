@@ -48,10 +48,10 @@ def band_level(f, p, channel):
     return np.mean(p[low:high])
 
 
-def psd(x, fs, onesided=True):
+def psd(x, fs):
     """
-    Return the power spectral density of a signal, Welch averaged over
-    segments of a tenth of the signal with a Hann window and 50 % overlap.
+    Return the two-sided power spectral density of a signal, Welch averaged
+    over segments of a tenth of the signal with a Hann window and 50 % overlap.
 
     Parameters
     ----------
@@ -59,8 +59,6 @@ def psd(x, fs, onesided=True):
         Signal
     fs : float
         Sample rate in Hz
-    onesided : bool
-        One-sided spectrum of a real signal, or two-sided spectrum
 
     Returns
     -------
@@ -70,7 +68,7 @@ def psd(x, fs, onesided=True):
     nperseg = round(len(x) * 10 / 100)
     noverlap = round(nperseg * 50 / 100)
     window = sig.windows.tukey(nperseg, 1)
-    f, p = sig.welch(x, fs, window, nperseg, noverlap=noverlap, detrend=False, return_onesided=onesided)
+    f, p = sig.welch(x, fs, window, nperseg, noverlap=noverlap, detrend=False, return_onesided=False)
     order = f.argsort()
     return f[order], p[order]
 
