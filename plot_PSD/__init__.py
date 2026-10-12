@@ -8,18 +8,16 @@ from nr_signal_utils import spectrum
 
 def plot_PSD(**kwargs):
 
-        """ Method for plotting PSD of one signal. If BW is given and no_plot is 0, will add ACLR levels to figure.
+        """ Method for plotting PSD of one signal. If carriers is given and no_plot is 0, will add ACLR levels to figure.
 
             Parameters
             ----------
             signal : array 
                 Signal to be plotted
-            Fc : integer
-                Carrier frequency
             Fs : integer
                 Sampling frequency
-            BW : integer
-                Bandwidth of whole signal
+            carriers : list of nr_signal_utils.carrier.Carrier
+                Carriers of the signal, for the ACLR levels
             no_plot : binary
                 If 1, will return y and x- axis data (and ACLR) without plotting.
             double_sided: Boolean
@@ -38,17 +36,20 @@ def plot_PSD(**kwargs):
                 if str -> dynamically calculate min automatically
             Example
             -------
-            self.plot_PSD(signal=[1+....-0.5],Fc=1e9,Fs=10e9, BW=200e6, double_sided = True, label= 'string' )
+            plot_PSD(signal=[1+....-0.5],Fs=10e9, carriers=[Carrier("FR1", 100e6, 1, 0.5e-3, "64QAM")], double_sided = True, legend= 'string' )
 
         """
         s=[] #self.rf_signal
 
         ACLR_offset=kwargs.get('ACLR_offset',0)
 
-        BW=kwargs.get('BW',0)
-        BW_conf=kwargs.get('BW_conf',0)
-        ACLR_BW=kwargs.get('ACLR_BW',0)
-        Fc=kwargs.get('Fc',0)
+        carriers=kwargs.get('carriers',[])
+        Fc=0
+        if len(carriers)==1:
+            BW=carriers[0].bw
+            BW_conf=carriers[0].bw_config
+            ACLR_BW=carriers[0].aclr_bw
+            Fc=carriers[0].offset
 
         Fs=int(kwargs.get('Fs',0))
 
@@ -72,13 +73,15 @@ def plot_PSD(**kwargs):
         PSD_min = kwargs.get('PSD_min', -60)
 
         f_centre=kwargs.get('f_centre', Fc)
-        if hasattr(BW,"__len__") :
-            f_span=kwargs.get('f_span', BW+100E6)
-            if hasattr(f_span,"__len__") :
-                BW_tot=sum(abs(BW))
-                f_span=BW_tot+4*max(BW)
+        if 'f_span' in kwargs:
+            f_span=kwargs.get('f_span')
+        elif len(carriers)>1:
+            bws=[c.bw for c in carriers]
+            f_span=sum(bws)+4*max(bws)
+        elif len(carriers)==1:
+            f_span=BW+100E6
         else:
-            f_span=kwargs.get('f_span', BW+100E6)
+            f_span=100E6
 
         if zoom_plt ==1:
             if decim==0:
@@ -134,91 +137,66 @@ def plot_PSD(**kwargs):
             ax=spectrum.plot_psd(f_plot,Pxx,unit=unit_txt,label=legend)
             fig=ax.figure
 
-        if hasattr(BW,"__len__") and len(BW)>1 :
-            if not hasattr(BW_conf,"__len__"):
-                BW_conf=[BW_conf]
-            if not hasattr(ACLR_BW,"__len__"):
-                ACLR_BW=[ACLR_BW]
+        if len(carriers)>1 :
             ACLR=[]
             matrix=np.transpose(np.vstack((f,Pxx)))
             matrix=matrix[matrix[:,0].argsort()]
-            BW_vect_abs=abs(BW)
-            f_off=[]
-            l=[]
-            h=[]
-            chpow=[]
-            BW_idx=0
-            for i in range(0,len(BW)):
-                BWi=BW[i] 
-                if BWi>0:
-                    offset=np.sum(BW_vect_abs[0:i])+BWi/2-BW_tot/2
-                    f_off.append(offset)
-                    lf=(np.abs(matrix[:,0]-(Fc+offset-0.5*BW_conf[BW_idx]))).argmin()
-                    hf=(np.abs(matrix[:,0]-(Fc+offset+0.5*BW_conf[BW_idx]))).argmin()
+            for i,c in enumerate(carriers):
+                BWi=c.bw
+                offset=c.offset
+                lf=(np.abs(matrix[:,0]-(offset-0.5*c.bw_config))).argmin()
+                hf=(np.abs(matrix[:,0]-(offset+0.5*c.bw_config))).argmin()
 
-                    if i==0:
-                        min_f=min(f)
-                    elif BW[i-1]<0 and abs(BW[i-1])>=BWi:
-                        min_f=hf
-                    else:
-                        min_f=hf+abs(BW[i-1])
-                    chpow=np.mean(matrix[lf:hf,1])
-                    lf=matrix[lf,0]
-                    hf=matrix[hf,0]
-                    carriers_left=(lf-min_f)/BWi
-                    if carriers_left>=2 and min_f<=lf-2.5*BWi:
-                        carriers_left=2
-                    elif carriers_left>=1 and  min_f<=lf-1.5*BWi:
-                        carriers_left=1
-                    else:
-                        carriers_left=0
-                    if i < len(BW)-1:
-                        if BW[i+1]<0 and abs(BW[i+1])>=BWi:
-                            max_f=hf+abs(BW[i+1])
+                if i==0:
+                    min_f=min(f)
+                else:
+                    min_f=hf+carriers[i-1].bw
+                chpow=np.mean(matrix[lf:hf,1])
+                lf=matrix[lf,0]
+                hf=matrix[hf,0]
+                carriers_left=(lf-min_f)/BWi
+                if carriers_left>=2 and min_f<=lf-2.5*BWi:
+                    carriers_left=2
+                elif carriers_left>=1 and  min_f<=lf-1.5*BWi:
+                    carriers_left=1
+                else:
+                    carriers_left=0
+                if i < len(carriers)-1:
+                    max_f=hf
+                else:
+                    max_f=max(f)
+                carriers_right=(max_f-hf)/BWi
+                if carriers_right>=2 and max_f>=hf-2.5*BWi:
+                    carriers_right=2
+                elif carriers_right>=1 and  max_f>=hf-1.5*BWi:
+                    carriers_right=1
+                else:
+                    carriers_right=0
 
+                for k in range(-int(carriers_left),int(carriers_right+1)):
+                    if k ==0:
+                        l=(np.abs(matrix[:,0]-(offset+(k-0.5)*c.bw_config))).argmin()
+                        h=(np.abs(matrix[:,0]-(offset+(k+0.5)*c.bw_config))).argmin()
+                    else:
+                        if ACLR_offset==0:
+                            l=(np.abs(matrix[:,0]-(offset+(k*BWi-0.5*c.aclr_bw)))).argmin()
+                            h=(np.abs(matrix[:,0]-(offset+(k*BWi+0.5*c.aclr_bw)))).argmin()
                         else:
-                            max_f=hf
-
-                    else:
-                        max_f=max(f)
-                    carriers_right=(max_f-hf)/BWi
-                    if carriers_right>=2 and max_f>=hf-2.5*BWi:
-                        carriers_right=2
-                    elif carriers_right>=1 and  max_f>=hf-1.5*BWi:
-                        carriers_right=1
-                    else:
-                        carriers_right=0
-
-                    for i in range(-int(carriers_left),int(carriers_right+1)):
-                        if i ==0:
-                            l=(np.abs(matrix[:,0]-(Fc+offset+(i-0.5)*BW_conf[BW_idx]))).argmin()
-                            h=(np.abs(matrix[:,0]-(Fc+offset+(i+0.5)*BW_conf[BW_idx]))).argmin()
-                        else:    
-                            if ACLR_offset==0:
-                                l=(np.abs(matrix[:,0]-(Fc+offset+(i*BWi-0.5*ACLR_BW[BW_idx])))).argmin()
-                                h=(np.abs(matrix[:,0]-(Fc+offset+(i*BWi+0.5*ACLR_BW[BW_idx])))).argmin()
-                            else: 
-                                l=(np.abs(matrix[:,0]-(Fc+ACLR_offset+(i*BWi-0.5*ACLR_BW[BW_idx])))).argmin()
-                                h=(np.abs(matrix[:,0]-(Fc+ACLR_offset+(i*BWi+0.5*ACLR_BW[BW_idx])))).argmin()
-                        ac=np.mean(matrix[l:h,1])/chpow
-                        ac_plot=np.mean(matrix[l:h,1])/max(matrix[:,1])
-                        ACLR.append(10*np.log10(ac))
-                        if no_plot==0:
-                            if i==0:
-                                pass
-                            else:
-                                ax.hlines(10*np.log10(ac_plot),(Fc+offset+(i*BWi-0.5*ACLR_BW[BW_idx]))/(freq_scale),(Fc+offset+(i*BWi+0.5*ACLR_BW[BW_idx]))/(freq_scale),label=str(ac),colors='r',zorder=10)
-                                ax.text(x=(Fc+offset+(i-0.5)*BWi)/(freq_scale),y=10*np.log10(ac_plot)+3,s=str(round(10*np.log10(ac),2)),fontsize='small',color='r')
-
-                    BW_idx+=1
+                            l=(np.abs(matrix[:,0]-(ACLR_offset+(k*BWi-0.5*c.aclr_bw)))).argmin()
+                            h=(np.abs(matrix[:,0]-(ACLR_offset+(k*BWi+0.5*c.aclr_bw)))).argmin()
+                    ac=np.mean(matrix[l:h,1])/chpow
+                    ac_plot=np.mean(matrix[l:h,1])/max(matrix[:,1])
+                    ACLR.append(10*np.log10(ac))
+                    if no_plot==0:
+                        if k==0:
+                            pass
+                        else:
+                            ax.hlines(10*np.log10(ac_plot),(offset+(k*BWi-0.5*c.aclr_bw))/(freq_scale),(offset+(k*BWi+0.5*c.aclr_bw))/(freq_scale),label=str(ac),colors='r',zorder=10)
+                            ax.text(x=(offset+(k-0.5)*BWi)/(freq_scale),y=10*np.log10(ac_plot)+3,s=str(round(10*np.log10(ac),2)),fontsize='small',color='r')
 
         else:
 
-            if BW!=0 :
-                if BW_conf==0:
-                    BW_conf=BW
-                if ACLR_BW==0:
-                    ACLR_BW=BW_conf
+            if len(carriers)==1 :
                 ACLR=[]
                 matrix=np.transpose(np.vstack((f,Pxx)))
                 matrix=matrix[matrix[:,0].argsort()]
@@ -266,16 +244,11 @@ def plot_PSD(**kwargs):
                 plt.ylim(PSD_min,10)
             plt.show(block=False)
         if no_plot==0:
-            if hasattr(BW,"__len__") and len(BW)>1:
+            if len(carriers)>0:
                 return fig, ACLR
-
-            if BW!=0:
-                return fig, ACLR 
             return fig
         else:
-            if hasattr(BW,"__len__") and len(BW)>1:
-                return f_plot/(freq_scale),y_plot, ACLR
-            if BW!=0:
+            if len(carriers)>0:
                 return f_plot/(freq_scale),y_plot, ACLR
             else:
                 return f_plot/(freq_scale),y_plot

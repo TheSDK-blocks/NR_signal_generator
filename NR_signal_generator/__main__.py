@@ -22,8 +22,8 @@ def multi_carrier():
     return contiguous(carriers, raster=100e3)
 
 
-def run(carriers, osr):
-    """Generate and analyze the carriers, print the EVM and plot the results."""
+def run(carriers, osr, aclr=False):
+    """Generate and analyze the carriers, print the EVM and plot the results, with the ACLR if aclr."""
     test = NR_signal_generator()
     test.carriers = carriers
     test.osr = osr
@@ -48,9 +48,13 @@ def run(carriers, osr):
         plt.title("Carrier " + str(i + 1))
         plt.show(block=False)
 
+    aclr_carriers = []
+    if aclr:
+        aclr_carriers = carriers
     plot_PSD(
         signal=test.s_struct["s"][:, 1],
         Fs=test.s_struct["Fs"],
+        carriers=aclr_carriers,
         PSD_min=-120
     )
     plt.show()
@@ -59,7 +63,7 @@ def run(carriers, osr):
 def main():
     demo = "single"  # "single" or "multi"
     if demo == "single":
-        run(single_carrier(), osr=1)
+        run(single_carrier(), osr=5, aclr=True)
     elif demo == "multi":
         run(multi_carrier(), osr=1)
     else:
