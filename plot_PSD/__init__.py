@@ -3,7 +3,8 @@ Power spectral density plotter with ACLR annotation, and plot_SEM.
 """
 import numpy as np
 import matplotlib.pyplot as plt
-import scipy.signal as sig
+
+from nr_signal_utils import spectrum
 
 def plot_PSD(**kwargs):
 
@@ -114,25 +115,12 @@ def plot_PSD(**kwargs):
             s=sign
             Fs=Fs/og_decim
 
-        Lsegm_perc = 10
-        param = 1
-        overlap_perc = 50
-
-        Lsegm = round(len(s)*Lsegm_perc/100)
-        noverlap = round(Lsegm * overlap_perc/100)
-
-        win=sig.windows.tukey(Lsegm,param)
-
-        f,Pxx=sig.welch(s,Fs,win,Lsegm,noverlap=noverlap,detrend=False, return_onesided= not(d_s))
+        f,Pxx=spectrum.psd(s,Fs,onesided= not(d_s))
 
         y=10*np.log10(Pxx/max(Pxx))
 
         f_plot =f
         y_plot =y
-
-        o=f_plot.argsort()
-        f_plot = f_plot[o]
-        y_plot = y_plot[o]
 
         if zoom_plt == 1:
 
@@ -143,11 +131,8 @@ def plot_PSD(**kwargs):
             f_ctr_min_idx  = f_ctr_min_diff.argmin()
 
         if no_plot==0:
-            fig,ax=plt.subplots()
-            plt.plot(f_plot/(freq_scale),y_plot, label = str(legend))
-            plt.grid(visible=True)
-            plt.legend()
-            plt.title("Signal spectrum")
+            ax=spectrum.plot_psd(f_plot,Pxx,unit=unit_txt,label=legend)
+            fig=ax.figure
 
         if hasattr(BW,"__len__") and len(BW)>1 :
             if not hasattr(BW_conf,"__len__"):
@@ -279,8 +264,6 @@ def plot_PSD(**kwargs):
                 ax.set_xlim(f_plot[f_ctr_min_idx]/(freq_scale),f_plot[f_ctr_max_idx]/(freq_scale))
             if not isinstance(PSD_min,str):
                 plt.ylim(PSD_min,10)
-            plt.xlabel("Frequency ["+unit_txt+"]")
-            plt.ylabel("PSD [dB]")
             plt.show(block=False)
         if no_plot==0:
             if hasattr(BW,"__len__") and len(BW)>1:
@@ -291,11 +274,11 @@ def plot_PSD(**kwargs):
             return fig
         else:
             if hasattr(BW,"__len__") and len(BW)>1:
-                return f_plot[o]/(freq_scale),y_plot[o], ACLR
+                return f_plot/(freq_scale),y_plot, ACLR
             if BW!=0:
-                return f_plot[o]/(freq_scale),y_plot[o], ACLR
+                return f_plot/(freq_scale),y_plot, ACLR
             else:
-                return f_plot[o]/(freq_scale),y_plot[o]
+                return f_plot/(freq_scale),y_plot
 
 def plot_SEM(self,**kwargs):
 

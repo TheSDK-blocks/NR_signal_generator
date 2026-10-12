@@ -1,0 +1,68 @@
+import matplotlib.pyplot as plt
+import numpy as np
+import scipy.signal as sig
+
+# Frequency axis scale per unit
+UNITS = {"Hz": 1.0, "kHz": 1e3, "MHz": 1e6, "GHz": 1e9}
+
+
+def psd(x, fs, onesided=True):
+    """
+    Return the power spectral density of a signal, Welch averaged over
+    segments of a tenth of the signal with a Hann window and 50 % overlap.
+
+    Parameters
+    ----------
+    x : array
+        Signal
+    fs : float
+        Sample rate in Hz
+    onesided : bool
+        One-sided spectrum of a real signal, or two-sided spectrum
+
+    Returns
+    -------
+    Frequencies in Hz in ascending order, and the power spectral density in
+    |x|^2 / Hz.
+    """
+    nperseg = round(len(x) * 10 / 100)
+    noverlap = round(nperseg * 50 / 100)
+    window = sig.windows.tukey(nperseg, 1)
+    f, p = sig.welch(x, fs, window, nperseg, noverlap=noverlap, detrend=False, return_onesided=onesided)
+    order = f.argsort()
+    return f[order], p[order]
+
+
+def plot_psd(f, p, ax=None, unit="GHz", label=""):
+    """
+    Plot a power spectral density in dB relative to its highest value.
+
+    Parameters
+    ----------
+    f : array
+        Frequencies in Hz, as returned by psd
+    p : array
+        Power spectral density, as returned by psd
+    ax : matplotlib Axes or None
+        Axes to plot into, None for a new figure
+    unit : string ("Hz", "kHz", "MHz", "GHz")
+        Frequency axis unit
+    label : string
+        Legend label
+
+    Returns
+    -------
+    The matplotlib Axes.
+    """
+    if unit not in UNITS:
+        raise ValueError(f"unit must be one of {', '.join(UNITS)}, got {unit}")
+    if ax is None:
+        _, ax = plt.subplots()
+    level = 10 * np.log10(p / max(p))
+    ax.plot(f / UNITS[unit], level, label=str(label))
+    ax.grid(visible=True)
+    ax.legend()
+    ax.set_title("Signal spectrum")
+    ax.set_xlabel(f"Frequency [{unit}]")
+    ax.set_ylabel("PSD [dB]")
+    return ax
