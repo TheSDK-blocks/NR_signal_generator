@@ -22,6 +22,7 @@
 
 
 import numpy as np
+from scipy.spatial import cKDTree
 
 
 BITS_PER_SYMBOL = {
@@ -107,6 +108,6 @@ def demodulate(symbols, modulation):
     if symbols.ndim != 1 or not np.all(np.isfinite(symbols)):
         raise ValueError("symbols must be a one-dimensional finite sequence")
 
-    distances = np.abs(symbols[:, None] - points[None, :])
-    nearest = np.argmin(distances, axis=1)
+    tree = cKDTree(np.column_stack((points.real, points.imag)))
+    _, nearest = tree.query(np.column_stack((symbols.real, symbols.imag)))
     return labels[nearest].reshape(-1)
