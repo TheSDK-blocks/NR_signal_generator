@@ -10,7 +10,8 @@ def equalize(RE, RE_id, pilots):
     symbols l of the pilot mask:
 
         A(k)   = mean_l |Z(k, l)|
-        Phi(k) = mean_l unwrap_l(arg Z(k, l)),  unwrapping jumps of at least pi
+        Phi(k) = phi_0 + mean_l unwrap_l(arg(Z(k, l) e^(-j phi_0))),  phi_0 = arg sum Z,
+                 unwrapping jumps of at least pi
         A, Phi smoothed across the pilot subcarriers k_j by a moving average of
                2 h_j + 1 samples, h_j = min(j, K - 1 - j, 9)
         H(k)   = interp(A)(k) exp(j interp(Phi)(k)) for every subcarrier k
@@ -45,7 +46,10 @@ def equalize(RE, RE_id, pilots):
     l = np.flatnonzero(pilots.any(axis=0))
     z = RE[np.ix_(k, l)] / RE_id[np.ix_(k, l)]
     amplitude = moving_average(np.abs(z).mean(axis=1))
-    phase = moving_average(np.unwrap(np.angle(z), axis=1).mean(axis=1))
+    # Phases relative to the common phase, so that they do not wrap at +-pi
+    common = np.angle(z.sum())
+    relative = np.unwrap(np.angle(z * np.exp(-1j * common)), axis=1)
+    phase = common + moving_average(relative.mean(axis=1))
 
     subcarriers = np.arange(RE.shape[0])
     h = np.interp(subcarriers, k, amplitude) * np.exp(1j * np.interp(subcarriers, k, phase))
