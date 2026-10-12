@@ -1,10 +1,10 @@
 import matplotlib.pyplot as plt
 
-from plot_PSD import plot_PSD
-
 from . import NR_signal_generator
 from nr_signal_utils.carrier import Carrier
 from nr_signal_utils.multicarrier import contiguous
+from nr_signal_utils.plots import plot_constellation
+from nr_signal_utils.plots import plot_nr_spectrum
 
 
 def single_carrier():
@@ -42,21 +42,14 @@ def run(carriers, osr, aclr=False):
     plt.plot(test.s_struct["s"][:, 0], test.s_struct["s"][:, 2])
     plt.show(block=False)
     for i in range(0, len(carriers)):
-        plt.figure()
-        plt.plot(test.dem_cnstl_vec[i].real, test.dem_cnstl_vec[i].imag, "o")
-        plt.plot(test.cnstl[i].real, test.cnstl[i].imag, "o")
-        plt.title("Carrier " + str(i + 1))
+        plot_constellation(test.dem_cnstl_vec[i], test.cnstl[i], test.EVM[i], title="Carrier " + str(i + 1))
         plt.show(block=False)
 
-    aclr_carriers = []
+    aclr_result = []
     if aclr:
-        aclr_carriers = carriers
-    plot_PSD(
-        signal=test.s_struct["s"][:, 1],
-        Fs=test.s_struct["Fs"],
-        carriers=aclr_carriers,
-        PSD_min=-120
-    )
+        aclr_result = test.ACLR
+    ax = plot_nr_spectrum(*test.psd, aclr_result)
+    ax.set_ylim(-120, 10)
     plt.show()
 
 

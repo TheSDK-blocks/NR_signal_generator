@@ -35,7 +35,9 @@ from nr_signal_utils import analyzer
 from nr_signal_utils import carrier
 from nr_signal_utils import constellation
 from nr_signal_utils import generator
+from nr_signal_utils import measurements
 from nr_signal_utils import multicarrier
+from nr_signal_utils import spectrum
 
 
 class NR_signal_generator(thesdk):
@@ -116,6 +118,9 @@ class NR_signal_generator(thesdk):
         self.dem_cnstl_vec, self.dem_bits, self.EVM = analyzer.analyze(
             y, self.cnstl, self.carriers, self.osr, self.rx_filter
         )
+        Fs = multicarrier.plan(self.carriers, self.osr)["Fs"]
+        self.psd = spectrum.psd(y, Fs, onesided=False)
+        self.ACLR = measurements.aclr(*self.psd, self.carriers)
 
     def run_dem(self, *arg):
         if self.model == "py":
