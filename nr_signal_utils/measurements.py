@@ -31,10 +31,10 @@ def aclr_channels(f, carriers, aclr_offset=0):
     """
     Return the channels of the ACLR measurement of each carrier.
 
-    One carrier gets up to two adjacent channels on each side, spaced by its
-    channel bandwidth (or aclr_offset), as far as the spectrum f covers them.
-    Several carriers get up to two adjacent channels each, limited by the
-    neighbouring carriers.
+    Each carrier gets up to two adjacent channels on each side, spaced by its
+    channel bandwidth (or aclr_offset). An adjacent channel is kept if a
+    channel bandwidth around its centre lies within the spectrum f and clear
+    of the channel bandwidths of the other carriers.
 
     Parameters
     ----------
@@ -43,8 +43,7 @@ def aclr_channels(f, carriers, aclr_offset=0):
     carriers : list of carrier.Carrier
         Carriers of the signal
     aclr_offset : float
-        Adjacent channel spacing (one carrier) or centre (several carriers)
-        in Hz, 0 for the carrier channel bandwidth and offset
+        Adjacent channel spacing in Hz, 0 for the carrier channel bandwidth
 
     Returns
     -------
@@ -53,59 +52,21 @@ def aclr_channels(f, carriers, aclr_offset=0):
     or above it.
     """
     channels = []
-    if len(carriers) == 1:
-        c = carriers[0]
-        n = (max(f) - min(f)) / c.bw
-        if n >= 5 and max(f) > c.offset + 2.5 * c.bw and min(f) < c.offset - 2.5 * c.bw:
-            n = 5
-        elif n >= 3 and max(f) >= c.offset + 1.5 * c.bw and min(f) <= c.offset - 1.5 * c.bw:
-            n = 3
-        else:
-            n = 0
-        half = int(np.floor(n / 2))
-        for k in range(-half, half + 1):
-            if k == 0:
-                channels.append((0, k, spectrum.Channel(c.offset, c.bw_config)))
-            elif aclr_offset == 0:
-                channels.append((0, k, spectrum.Channel(c.offset + k * c.bw, c.aclr_bw)))
-            else:
-                channels.append((0, k, spectrum.Channel(c.offset + k * aclr_offset, c.aclr_bw)))
-        return channels
-
     for i, c in enumerate(carriers):
-        lf = np.abs(f - (c.offset - 0.5 * c.bw_config)).argmin()
-        hf = np.abs(f - (c.offset + 0.5 * c.bw_config)).argmin()
-        if i == 0:
-            min_f = min(f)
+        if aclr_offset == 0:
+            spacing = c.bw
         else:
-            min_f = hf + carriers[i - 1].bw
-        lf = f[lf]
-        hf = f[hf]
-        left = (lf - min_f) / c.bw
-        if left >= 2 and min_f <= lf - 2.5 * c.bw:
-            left = 2
-        elif left >= 1 and min_f <= lf - 1.5 * c.bw:
-            left = 1
-        else:
-            left = 0
-        if i < len(carriers) - 1:
-            max_f = hf
-        else:
-            max_f = max(f)
-        right = (max_f - hf) / c.bw
-        if right >= 2 and max_f >= hf - 2.5 * c.bw:
-            right = 2
-        elif right >= 1 and max_f >= hf - 1.5 * c.bw:
-            right = 1
-        else:
-            right = 0
-        for k in range(-int(left), int(right + 1)):
+            spacing = aclr_offset
+        edges_below = [n.offset + n.bw / 2 for n in carriers if n.offset < c.offset]
+        edges_above = [n.offset - n.bw / 2 for n in carriers if n.offset > c.offset]
+        low = max([f[0]] + edges_below)
+        high = min([f[-1]] + edges_above)
+        for k in range(-2, 3):
+            center = c.offset + k * spacing
             if k == 0:
                 channels.append((i, k, spectrum.Channel(c.offset, c.bw_config)))
-            elif aclr_offset == 0:
-                channels.append((i, k, spectrum.Channel(c.offset + k * c.bw, c.aclr_bw)))
-            else:
-                channels.append((i, k, spectrum.Channel(aclr_offset + k * c.bw, c.aclr_bw)))
+            elif low <= center - c.bw / 2 and center + c.bw / 2 <= high:
+                channels.append((i, k, spectrum.Channel(center, c.aclr_bw)))
     return channels
 
 
