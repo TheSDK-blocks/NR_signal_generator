@@ -34,6 +34,7 @@ def run(carriers, osr, aclr=False):
     test.osr = osr
     test.in_bits = ["max"] * len(carriers)
     test.tx_filter = False
+    test.aclr = aclr
     test.run_gen()
 
     test.IOS.Members["in_dem"].Data = test.IOS.Members["out"].Data
@@ -50,10 +51,7 @@ def run(carriers, osr, aclr=False):
         plot_constellation(test.dem_cnstl_vec[i], test.cnstl[i], test.EVM[i], title="Carrier " + str(i + 1))
         plt.show(block=False)
 
-    aclr_result = []
-    if aclr:
-        aclr_result = test.ACLR
-    ax = plot_nr_spectrum(*test.psd, aclr_result)
+    ax = plot_nr_spectrum(*test.psd, test.ACLR)
     ax.set_ylim(-120, 10)
     plt.show()
 

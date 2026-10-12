@@ -31,15 +31,16 @@ def aclr_channels(f, carriers, aclr_offset=0):
     """
     Return the channels of the ACLR measurement of each carrier.
 
-    Each carrier gets up to two adjacent channels on each side, spaced by its
-    channel bandwidth (or aclr_offset). An adjacent channel is kept if a
-    channel bandwidth around its centre lies within the spectrum f and clear
-    of the channel bandwidths of the other carriers.
+    Every carrier gets its own channel, and the lowest and highest carriers
+    the first adjacent channel below and above them, spaced by their channel
+    bandwidth (or aclr_offset) (TS 38.104, Section 6.6.3.2). The second
+    adjacent channel is added where the spectrum f covers it.
 
     Parameters
     ----------
     f : array
-        Frequencies in Hz in ascending order, as returned by spectrum.psd
+        Frequencies in Hz in ascending order of the two-sided spectrum, as
+        returned by spectrum.psd
     carriers : list of carrier.Carrier
         Carriers of the signal
     aclr_offset : float
@@ -48,25 +49,30 @@ def aclr_channels(f, carriers, aclr_offset=0):
     Returns
     -------
     List of (carrier index, k, spectrum.Channel), with k = 0 for the
-    carrier's own channel and k < 0 or k > 0 for the adjacent channels below
-    or above it.
+    carrier's own channel and k = -2, -1 or k = 1, 2 for the adjacent
+    channels below or above it.
     """
+    nyquist = abs(f[0])
+    offsets = [c.offset for c in carriers]
+    lowest = int(np.argmin(offsets))
+    highest = int(np.argmax(offsets))
     channels = []
     for i, c in enumerate(carriers):
         if aclr_offset == 0:
             spacing = c.bw
         else:
             spacing = aclr_offset
-        edges_below = [n.offset + n.bw / 2 for n in carriers if n.offset < c.offset]
-        edges_above = [n.offset - n.bw / 2 for n in carriers if n.offset > c.offset]
-        low = max([f[0]] + edges_below)
-        high = min([f[-1]] + edges_above)
-        for k in range(-2, 3):
-            center = c.offset + k * spacing
-            if k == 0:
-                channels.append((i, k, spectrum.Channel(c.offset, c.bw_config)))
-            elif low <= center - c.bw / 2 and center + c.bw / 2 <= high:
-                channels.append((i, k, spectrum.Channel(center, c.aclr_bw)))
+        if i == lowest:
+            second = spectrum.Channel(c.offset - 2 * spacing, c.aclr_bw)
+            if second.center - second.width / 2 >= -nyquist:
+                channels.append((i, -2, second))
+            channels.append((i, -1, spectrum.Channel(c.offset - spacing, c.aclr_bw)))
+        channels.append((i, 0, spectrum.Channel(c.offset, c.bw_config)))
+        if i == highest:
+            channels.append((i, 1, spectrum.Channel(c.offset + spacing, c.aclr_bw)))
+            second = spectrum.Channel(c.offset + 2 * spacing, c.aclr_bw)
+            if second.center + second.width / 2 <= nyquist:
+                channels.append((i, 2, second))
     return channels
 
 
@@ -97,7 +103,7 @@ def aclr(f, p, carriers, aclr_offset=0):
     Raises
     ------
     ValueError
-        If a channel extends past the Nyquist frequency.
+        If a first adjacent channel extends past the Nyquist frequency.
     """
     nyquist = abs(f[0])
     peak = max(p)

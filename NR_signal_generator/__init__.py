@@ -73,6 +73,7 @@ class NR_signal_generator(thesdk):
         # Can be set externally, but is not propagated
         self.tx_filter = True  # transmit channel filter in the generator
         self.rx_filter = True  # receive channel-select filter in the analyzer
+        self.aclr = False  # measure the ACLR, needs a spectrum covering the adjacent channels
 
         self.norm = "max"  # peak normalization, see generator.normalize
         self.backoff_db = 0.0  # peak back-off from one in dB, see generator.normalize
@@ -120,7 +121,9 @@ class NR_signal_generator(thesdk):
         )
         Fs = multicarrier.plan(self.carriers, self.osr)["Fs"]
         self.psd = spectrum.psd(y, Fs)
-        self.ACLR = measurements.aclr(*self.psd, self.carriers)
+        self.ACLR = []
+        if self.aclr:
+            self.ACLR = measurements.aclr(*self.psd, self.carriers)
 
     def run_dem(self, *arg):
         if self.model == "py":
