@@ -1,9 +1,51 @@
+from dataclasses import dataclass
+
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.signal as sig
 
 # Frequency axis scale per unit
 UNITS = {"Hz": 1.0, "kHz": 1e3, "MHz": 1e6, "GHz": 1e9}
+
+
+@dataclass(frozen=True)
+class Channel:
+    """
+    Frequency band of a channel.
+
+    Parameters
+    ----------
+    center : float
+        Centre frequency in Hz
+    width : float
+        Bandwidth in Hz
+    """
+
+    center: float
+    width: float
+
+
+def band_level(f, p, channel):
+    """
+    Return the mean power spectral density between the frequency bins nearest
+    to the band edges of a channel.
+
+    Parameters
+    ----------
+    f : array
+        Frequencies in Hz in ascending order, as returned by psd
+    p : array
+        Power spectral density, as returned by psd
+    channel : Channel
+        Channel
+
+    Returns
+    -------
+    Mean power spectral density.
+    """
+    low = np.abs(f - (channel.center - channel.width / 2)).argmin()
+    high = np.abs(f - (channel.center + channel.width / 2)).argmin()
+    return np.mean(p[low:high])
 
 
 def psd(x, fs, onesided=True):

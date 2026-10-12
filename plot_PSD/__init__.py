@@ -1,9 +1,13 @@
 """
 Power spectral density plotter with ACLR annotation, and plot_SEM.
 """
+import dataclasses
+
 import numpy as np
 import matplotlib.pyplot as plt
 
+from nr_signal_utils import measurements
+from nr_signal_utils import plots
 from nr_signal_utils import spectrum
 
 def plot_PSD(**kwargs):
@@ -47,8 +51,6 @@ def plot_PSD(**kwargs):
         Fc=0
         if len(carriers)==1:
             BW=carriers[0].bw
-            BW_conf=carriers[0].bw_config
-            ACLR_BW=carriers[0].aclr_bw
             Fc=carriers[0].offset
 
         Fs=int(kwargs.get('Fs',0))
@@ -137,105 +139,13 @@ def plot_PSD(**kwargs):
             ax=spectrum.plot_psd(f_plot,Pxx,unit=unit_txt,label=legend)
             fig=ax.figure
 
-        if len(carriers)>1 :
-            ACLR=[]
-            matrix=np.transpose(np.vstack((f,Pxx)))
-            matrix=matrix[matrix[:,0].argsort()]
-            for i,c in enumerate(carriers):
-                BWi=c.bw
-                offset=c.offset
-                lf=(np.abs(matrix[:,0]-(offset-0.5*c.bw_config))).argmin()
-                hf=(np.abs(matrix[:,0]-(offset+0.5*c.bw_config))).argmin()
-
-                if i==0:
-                    min_f=min(f)
-                else:
-                    min_f=hf+carriers[i-1].bw
-                chpow=np.mean(matrix[lf:hf,1])
-                lf=matrix[lf,0]
-                hf=matrix[hf,0]
-                carriers_left=(lf-min_f)/BWi
-                if carriers_left>=2 and min_f<=lf-2.5*BWi:
-                    carriers_left=2
-                elif carriers_left>=1 and  min_f<=lf-1.5*BWi:
-                    carriers_left=1
-                else:
-                    carriers_left=0
-                if i < len(carriers)-1:
-                    max_f=hf
-                else:
-                    max_f=max(f)
-                carriers_right=(max_f-hf)/BWi
-                if carriers_right>=2 and max_f>=hf-2.5*BWi:
-                    carriers_right=2
-                elif carriers_right>=1 and  max_f>=hf-1.5*BWi:
-                    carriers_right=1
-                else:
-                    carriers_right=0
-
-                for k in range(-int(carriers_left),int(carriers_right+1)):
-                    if k ==0:
-                        l=(np.abs(matrix[:,0]-(offset+(k-0.5)*c.bw_config))).argmin()
-                        h=(np.abs(matrix[:,0]-(offset+(k+0.5)*c.bw_config))).argmin()
-                    else:
-                        if ACLR_offset==0:
-                            l=(np.abs(matrix[:,0]-(offset+(k*BWi-0.5*c.aclr_bw)))).argmin()
-                            h=(np.abs(matrix[:,0]-(offset+(k*BWi+0.5*c.aclr_bw)))).argmin()
-                        else:
-                            l=(np.abs(matrix[:,0]-(ACLR_offset+(k*BWi-0.5*c.aclr_bw)))).argmin()
-                            h=(np.abs(matrix[:,0]-(ACLR_offset+(k*BWi+0.5*c.aclr_bw)))).argmin()
-                    ac=np.mean(matrix[l:h,1])/chpow
-                    ac_plot=np.mean(matrix[l:h,1])/max(matrix[:,1])
-                    ACLR.append(10*np.log10(ac))
-                    if no_plot==0:
-                        if k==0:
-                            pass
-                        else:
-                            ax.hlines(10*np.log10(ac_plot),(offset+(k*BWi-0.5*c.aclr_bw))/(freq_scale),(offset+(k*BWi+0.5*c.aclr_bw))/(freq_scale),label=str(ac),colors='r',zorder=10)
-                            ax.text(x=(offset+(k-0.5)*BWi)/(freq_scale),y=10*np.log10(ac_plot)+3,s=str(round(10*np.log10(ac),2)),fontsize='small',color='r')
-
-        else:
-
-            if len(carriers)==1 :
-                ACLR=[]
-                matrix=np.transpose(np.vstack((f,Pxx)))
-                matrix=matrix[matrix[:,0].argsort()]
-                l=(np.abs(matrix[:,0]-(Fc-0.5*BW_conf))).argmin()
-                h=(np.abs(matrix[:,0]-(Fc+0.5*BW_conf))).argmin()
-                chpow=np.mean(matrix[l:h,1])
-
-                ncarrier=(max(f)-min(f))/BW
-                if ncarrier>=5 and max(f)>Fc+2.5*BW and min(f)<Fc-2.5*BW:
-                    ncarrier=5
-                elif ncarrier>=3 and max(f)>=Fc+1.5*BW and min(f)<=Fc-1.5*BW:
-                    ncarrier=3
-                else:
-                    ncarrier=0
-
-                for i in range(-int(np.floor(ncarrier/2)),int(np.floor(ncarrier/2)+1)):
-                    if i ==0:
-                        l=(np.abs(matrix[:,0]-(Fc+(i-0.5)*BW_conf))).argmin()
-                        h=(np.abs(matrix[:,0]-(Fc+(i+0.5)*BW_conf))).argmin()
-                    else:    
-                        if ACLR_offset==0:
-                            l=(np.abs(matrix[:,0]-(Fc+(i*BW-0.5*ACLR_BW)))).argmin()
-                            h=(np.abs(matrix[:,0]-(Fc+(i*BW+0.5*ACLR_BW)))).argmin()
-                        else:
-                            l=(np.abs(matrix[:,0]-(Fc+(i*ACLR_offset-0.5*ACLR_BW)))).argmin()
-                            h=(np.abs(matrix[:,0]-(Fc+(i*ACLR_offset+0.5*ACLR_BW)))).argmin()
-                    ac=np.mean(matrix[l:h,1])/chpow
-                    ACLR.append(10*np.log10(ac))
-                    ac_plot=np.mean(matrix[l:h,1])/max(matrix[:,1])
-                    if no_plot==0:
-                        if i==0:
-                            pass
-                        else:
-                            if ACLR_offset==0:
-                                ax.hlines(10*np.log10(ac_plot),(Fc+(i*BW-0.5*ACLR_BW))/(freq_scale),(Fc+(i*BW+0.5*ACLR_BW))/(freq_scale),label=str(ac),colors='r',zorder=10)
-                                ax.text(x=(Fc+(i-0.5)*BW)/(freq_scale),y=10*np.log10(ac_plot)+3,s=str(round(10*np.log10(ac),2)),fontsize='small',color='r')
-                            else:
-                                ax.hlines(10*np.log10(ac_plot),(Fc+(i*ACLR_offset-0.5*ACLR_BW))/(freq_scale),(Fc+(i*ACLR_offset+0.5*ACLR_BW))/(freq_scale),label=str(ac),colors='r',zorder=10)
-                                ax.text(x=(Fc+(i-0.5)*ACLR_offset)/(freq_scale),y=10*np.log10(ac_plot)+3,s=str(round(10*np.log10(ac),2)),fontsize='small',color='r')
+        if len(carriers)>0 :
+            if decim!=0 and len(carriers)==1:
+                carriers=[dataclasses.replace(carriers[0],offset=0)]
+            result=measurements.aclr(f,Pxx,carriers,ACLR_offset)
+            ACLR=[entry["aclr"] for entry in result]
+            if no_plot==0:
+                plots.annotate_aclr(ax,result,unit_txt)
 
         if no_plot==0:
             if zoom_plt == 1:
