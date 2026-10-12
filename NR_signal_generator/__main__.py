@@ -1,3 +1,5 @@
+import math
+
 import matplotlib.pyplot as plt
 
 from . import NR_signal_generator
@@ -13,13 +15,16 @@ def single_carrier():
 
 
 def multi_carrier():
-    """Return three contiguous carriers at different powers."""
+    """
+    Return intra-band contiguous carrier aggregation in band n78 (15 kHz
+    channel raster): 100 + 60 MHz 256QAM carriers at 30 kHz SCS with the same
+    power per resource block, 273 and 162 RBs.
+    """
     carriers = [
-        Carrier("FR1", 20e6, 1, 0.5e-3, "16QAM", power_dbm=-20.0),
         Carrier("FR1", 100e6, 1, 0.5e-3, "256QAM", power_dbm=0.0),
-        Carrier("FR1", 40e6, 1, 0.5e-3, "64QAM", power_dbm=-10.0),
+        Carrier("FR1", 60e6, 1, 0.5e-3, "256QAM", power_dbm=10 * math.log10(162 / 273)),
     ]
-    return contiguous(carriers, raster=100e3)
+    return contiguous(carriers, raster=15e3)
 
 
 def run(carriers, osr, aclr=False):
@@ -54,11 +59,11 @@ def run(carriers, osr, aclr=False):
 
 
 def main():
-    demo = "single"  # "single" or "multi"
+    demo = "multi"  # "single" or "multi"
     if demo == "single":
         run(single_carrier(), osr=5, aclr=True)
     elif demo == "multi":
-        run(multi_carrier(), osr=1)
+        run(multi_carrier(), osr=3, aclr=True)
     else:
         raise ValueError(f'demo must be "single" or "multi", got {demo}')
 
