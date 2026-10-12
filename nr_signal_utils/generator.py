@@ -37,8 +37,8 @@ def data_symbols(carriers, bits=None, seed=0):
     symbols = []
     for i, (c, b) in enumerate(zip(carriers, bits)):
         if b is None:
-            rng = np.random.RandomState((i + seed * 13 + 1) * 123)
-            b = rng.randint(2, size=c.n_bits)
+            rng = np.random.default_rng((seed, i))
+            b = rng.integers(2, size=c.n_bits)
         elif len(b) != c.n_bits:
             raise ValueError(f"carrier {i}: {len(b)} bits do not fill the {c.n_bits}-bit allocation")
         symbols.append(constellation.modulate(b, c.qam))
