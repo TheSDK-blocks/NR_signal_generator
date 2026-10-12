@@ -55,8 +55,8 @@ def pss(n_id2):
     return np.roll(1.0 - 2.0 * x, -43 * n_id2)
 
 
-def dmrs(N_ID_cell, Nsymb, RB):
-    """Demodulation Reference Signal r(m) for each OFDM symbol (TS 38.211, Section 7.4.1.1.1).
+def dmrs(N_ID_cell, symbols, RB):
+    """Demodulation Reference Signal r(m) for OFDM symbols of a frame (TS 38.211, Section 7.4.1.1.1).
 
         r(m) = (1 - 2 c(2m)) / sqrt(2) + j (1 - 2 c(2m + 1)) / sqrt(2)
         c_init = (2^17 (14 n_s + l + 1)(2 N_ID + 1) + 2 N_ID) mod 2^31
@@ -65,21 +65,21 @@ def dmrs(N_ID_cell, Nsymb, RB):
     ----------
     N_ID_cell : integer
        Cell ID
-    Nsymb : integer
-        Number of OFDM symbols
+    symbols : array
+        OFDM symbol indices within the frame, 14 n_s + l
     RB : integer
         Number of used Resource Blocks
 
     Returns
     -------
-    Complex array of shape (6 * RB, Nsymb).
+    Complex array of shape (6 * RB, len(symbols)).
     """
     N_RB = int(RB * 12 / 2)
-    r = np.zeros((N_RB, int(Nsymb)), complex)
-    for i in range(0, int(Nsymb)):
+    r = np.zeros((N_RB, len(symbols)), complex)
+    for i, symbol in enumerate(symbols):
         # get slot number & symbol number within the slot
-        ns = np.floor(i / 14)
-        l = i % 14
+        ns = np.floor(symbol / 14)
+        l = symbol % 14
 
         c_init = np.mod(
             (2**17 * (14 * ns + l + 1) * (2 * N_ID_cell + 1) + 2 * N_ID_cell),

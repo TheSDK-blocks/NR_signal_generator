@@ -131,12 +131,11 @@ def reference_grid(n_rb, n_symb, mu, bwp_start, bwp_size, n_id_cell, n_id2):
     values = np.zeros((n_sc, n_symb), complex)
     symb_in_frame = 2**mu * 10 * 14
     for frame_start in range(0, n_symb, symb_in_frame):
-        n = min(symb_in_frame, n_symb - frame_start)
-        l_frame = l[(l >= frame_start) & (l < frame_start + n)]
+        l_frame = l[(l >= frame_start) & (l < frame_start + symb_in_frame)]
         if l_frame.size == 0:
             continue
-        r_dmrs = sequences.dmrs(n_id_cell, n, int(bwp_start + bwp_size))
-        values[np.ix_(k, l_frame)] = r_dmrs[6 * int(bwp_start) :, l_frame - frame_start]
+        r_dmrs = sequences.dmrs(n_id_cell, l_frame - frame_start, int(bwp_start + bwp_size))
+        values[np.ix_(k, l_frame)] = r_dmrs[6 * int(bwp_start) :]
 
     l_pss = pss_symbol(n_symb)
     pss_start = n_sc // 2 - 120
