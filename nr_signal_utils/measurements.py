@@ -89,9 +89,10 @@ def aclr(f, p, carriers, aclr_offset=0):
     Returns
     -------
     List of dictionaries, one per channel, with the carrier index "carrier",
-    "k" and "channel" as in aclr_channels, the level of the channel relative
-    to the carrier's own channel "aclr" in dB, and relative to the highest
-    spectral density "level" in dB.
+    "k" and "channel" as in aclr_channels, the power in the channel relative
+    to the power in the carrier's own channel "aclr" in dB, and the mean
+    spectral density in the channel relative to the highest spectral density
+    "level" in dB.
 
     Raises
     ------
@@ -110,14 +111,15 @@ def aclr(f, p, carriers, aclr_offset=0):
                 f"extends past the Nyquist frequency {nyquist / 1e6:g} MHz"
             )
         own = spectrum.Channel(carriers[i].offset, carriers[i].bw_config)
-        reference = spectrum.band_level(f, p, own)
-        level = spectrum.band_level(f, p, channel)
+        reference = spectrum.band_power(f, p, own)
+        power = spectrum.band_power(f, p, channel)
+        density = power / channel.width
         entry = {
             "carrier": i,
             "k": k,
             "channel": channel,
-            "aclr": 10 * np.log10(level / reference),
-            "level": 10 * np.log10(level / peak),
+            "aclr": 10 * np.log10(power / reference),
+            "level": 10 * np.log10(density / peak),
         }
         result.append(entry)
     return result

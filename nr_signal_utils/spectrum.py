@@ -25,15 +25,15 @@ class Channel:
     width: float
 
 
-def band_level(f, p, channel):
+def band_power(f, p, channel):
     """
-    Return the mean power spectral density between the frequency bins nearest
-    to the band edges of a channel.
+    Return the power of a power spectral density within a channel, the sum of
+    p times the bin spacing over the bins with centres in the channel.
 
     Parameters
     ----------
     f : array
-        Frequencies in Hz in ascending order, as returned by psd
+        Equally spaced frequencies in Hz in ascending order, as returned by psd
     p : array
         Power spectral density, as returned by psd
     channel : Channel
@@ -41,11 +41,12 @@ def band_level(f, p, channel):
 
     Returns
     -------
-    Mean power spectral density.
+    Power in |x|^2.
     """
-    low = np.abs(f - (channel.center - channel.width / 2)).argmin()
-    high = np.abs(f - (channel.center + channel.width / 2)).argmin()
-    return np.mean(p[low:high])
+    low = channel.center - channel.width / 2
+    high = channel.center + channel.width / 2
+    inside = (f >= low) & (f <= high)
+    return np.sum(p[inside]) * (f[1] - f[0])
 
 
 def psd(x, fs):
