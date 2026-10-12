@@ -10,7 +10,7 @@ def nr_filter(x, fs, bw, fr):
     channel bandwidth bw.
 
     Kaiser-window FIR with 80 dB stopband attenuation, cut-off at bw / 2 and
-    its transition band in the guard band of the channel.
+    transition band B / 2 <= |f| <= bw - B / 2, B = numerology.max_bw_config.
 
     Parameters
     ----------
