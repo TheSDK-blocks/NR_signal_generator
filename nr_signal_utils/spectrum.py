@@ -89,7 +89,7 @@ def plot_psd(f, p, ax=None, unit="GHz", label=""):
     unit : string ("Hz", "kHz", "MHz", "GHz")
         Frequency axis unit
     label : string
-        Legend label
+        Line label, for a legend added by the caller
 
     Returns
     -------
@@ -102,7 +102,6 @@ def plot_psd(f, p, ax=None, unit="GHz", label=""):
     level = 10 * np.log10(p / max(p))
     ax.plot(f / UNITS[unit], level, label=str(label))
     ax.grid(visible=True)
-    ax.legend()
     ax.set_title("Signal spectrum")
     ax.set_xlabel(f"Frequency [{unit}]")
     ax.set_ylabel("PSD [dB]")
