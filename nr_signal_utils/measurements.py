@@ -27,14 +27,14 @@ def evm(reference, received):
     return np.sqrt(error / power)
 
 
-def aclr_channels(f, carriers, aclr_offset=0):
+def aclr_channels(f, carriers):
     """
     Return the channels of the ACLR measurement of each carrier.
 
     Every carrier gets its own channel, and the lowest and highest carriers
     the first adjacent channel below and above them, spaced by their channel
-    bandwidth (or aclr_offset) (TS 38.104, Section 6.6.3.2). The second
-    adjacent channel is added where the spectrum f covers it.
+    bandwidth (TS 38.104, Section 6.6.3.2). The second adjacent channel is
+    added where the spectrum f covers it.
 
     Parameters
     ----------
@@ -43,8 +43,6 @@ def aclr_channels(f, carriers, aclr_offset=0):
         returned by spectrum.psd
     carriers : list of carrier.Carrier
         Carriers of the signal
-    aclr_offset : float
-        Adjacent channel spacing in Hz, 0 for the carrier channel bandwidth
 
     Returns
     -------
@@ -58,25 +56,21 @@ def aclr_channels(f, carriers, aclr_offset=0):
     highest = int(np.argmax(offsets))
     channels = []
     for i, c in enumerate(carriers):
-        if aclr_offset == 0:
-            spacing = c.bw
-        else:
-            spacing = aclr_offset
         if i == lowest:
-            second = spectrum.Channel(c.offset - 2 * spacing, c.aclr_bw)
+            second = spectrum.Channel(c.offset - 2 * c.bw, c.aclr_bw)
             if second.center - second.width / 2 >= -nyquist:
                 channels.append((i, -2, second))
-            channels.append((i, -1, spectrum.Channel(c.offset - spacing, c.aclr_bw)))
+            channels.append((i, -1, spectrum.Channel(c.offset - c.bw, c.aclr_bw)))
         channels.append((i, 0, spectrum.Channel(c.offset, c.bw_config)))
         if i == highest:
-            channels.append((i, 1, spectrum.Channel(c.offset + spacing, c.aclr_bw)))
-            second = spectrum.Channel(c.offset + 2 * spacing, c.aclr_bw)
+            channels.append((i, 1, spectrum.Channel(c.offset + c.bw, c.aclr_bw)))
+            second = spectrum.Channel(c.offset + 2 * c.bw, c.aclr_bw)
             if second.center + second.width / 2 <= nyquist:
                 channels.append((i, 2, second))
     return channels
 
 
-def aclr(f, p, carriers, aclr_offset=0):
+def aclr(f, p, carriers):
     """
     Return the adjacent channel leakage of each carrier, see aclr_channels.
 
@@ -89,8 +83,6 @@ def aclr(f, p, carriers, aclr_offset=0):
         Power spectral density, as returned by spectrum.psd
     carriers : list of carrier.Carrier
         Carriers of the signal
-    aclr_offset : float
-        See aclr_channels
 
     Returns
     -------
@@ -108,7 +100,7 @@ def aclr(f, p, carriers, aclr_offset=0):
     nyquist = abs(f[0])
     peak = max(p)
     result = []
-    for i, k, channel in aclr_channels(f, carriers, aclr_offset):
+    for i, k, channel in aclr_channels(f, carriers):
         low = channel.center - channel.width / 2
         high = channel.center + channel.width / 2
         if low < -nyquist or high > nyquist:
