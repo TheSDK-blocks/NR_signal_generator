@@ -119,8 +119,8 @@ class NR_signal_generator(thesdk):
         self.dem_cnstl_vec, self.dem_bits, self.EVM = analyzer.analyze(
             y, self.cnstl, self.carriers, self.osr, self.rx_filter
         )
-        Fs = multicarrier.plan(self.carriers, self.osr)["Fs"]
-        self.psd = spectrum.psd(y, Fs)
+        plan = multicarrier.plan(self.carriers, self.osr)
+        self.psd = spectrum.psd(y[-plan["length"] :], plan["Fs"])
         self.ACLR = []
         if self.aclr:
             self.ACLR = measurements.aclr(*self.psd, self.carriers)

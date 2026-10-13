@@ -48,16 +48,17 @@ def analyze(y, ref_symbols, carriers, osr=1, rx_filter=True):
     Return the equalized data symbols, bits and EVM of each carrier of a
     multi-carrier NR downlink signal.
 
-    y must be exactly one period of a cyclic signal, as produced by
-    generator.generate: the receive filter, the PSS alignment and the FFT
-    windows all treat it as periodic. Any period of a steady-state cyclic
-    signal works, wherever it starts. Non-cyclic signals, such as arbitrary
-    captures, are not supported.
+    y is a capture of the cyclic signal produced by generator.generate,
+    repeated, at least one period long. The last period of y is analyzed: the
+    receive filter, the PSS alignment and the FFT windows all treat it as
+    periodic, wherever it starts. Start-up transients, such as the leading
+    zeros and filter fill of a DUT, must end at least one period before the
+    end of y.
 
     Parameters
     ----------
     y : array
-        Complex signal at the sample rate multicarrier.plan(carriers, osr)["Fs"]
+        Complex capture at the sample rate multicarrier.plan(carriers, osr)["Fs"]
     ref_symbols : list
         Transmitted data symbols of each carrier, as returned by generator.generate
     carriers : list of carrier.Carrier
@@ -73,8 +74,9 @@ def analyze(y, ref_symbols, carriers, osr=1, rx_filter=True):
     carrier.
     """
     plan = multicarrier.plan(carriers, osr)
-    if len(y) != plan["length"]:
-        raise ValueError(f"signal of {len(y)} samples is not one period of {plan['length']} samples")
+    if len(y) < plan["length"]:
+        raise ValueError(f"capture of {len(y)} samples is shorter than one period of {plan['length']} samples")
+    y = y[-plan["length"] :]
     if len(ref_symbols) != len(carriers):
         raise ValueError(f"{len(ref_symbols)} reference symbol arrays for {len(carriers)} carriers")
 
