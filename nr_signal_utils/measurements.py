@@ -87,10 +87,10 @@ def aclr(f, p, carriers):
     Returns
     -------
     List of dictionaries, one per channel, with the carrier index "carrier",
-    "k" and "channel" as in aclr_channels, the power in the channel relative
-    to the power in the carrier's own channel "aclr" in dB, and the mean
-    spectral density in the channel relative to the highest spectral density
-    "level" in dB.
+    "k" and "channel" as in aclr_channels, the power in the carrier's own
+    channel relative to the power in the channel "aclr" in dB, positive as in
+    TS 38.104, Section 6.6.3.2, and the mean spectral density in the channel
+    relative to the highest spectral density "level" in dB.
 
     Raises
     ------
@@ -116,7 +116,7 @@ def aclr(f, p, carriers):
             "carrier": i,
             "k": k,
             "channel": channel,
-            "aclr": 10 * np.log10(power / reference),
+            "aclr": 10 * np.log10(reference / power),
             "level": 10 * np.log10(density / peak),
         }
         result.append(entry)
