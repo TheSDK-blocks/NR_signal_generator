@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nr-signal-utils"
+version = "0.1.0"
+description = "5G NR downlink signal generation and analysis for DSP DUT testing"
+requires-python = ">=3.8"
+dependencies = ["matplotlib", "numpy", "scipy"]
+
+[tool.setuptools]
+packages = ["nr_signal_utils"]
