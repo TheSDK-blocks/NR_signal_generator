@@ -5,28 +5,17 @@ MODULE=$( basename ${THISDIR})
 #Defines TheSDK environment variables
 . ${THISDIR}/../../TheSDK.config
 
-#echo "Configuring FFT chisel generator"
-#cd $THISDIR/chisel && ./configure && cd ..
-
 CURRENTFILE=${THISDIR}/Makefile
 echo "Generating Makefile"
 
 cat << EOF > ${THISDIR}/Makefile
 
-#.PHONY: all sim chisel clean
 .PHONY: all sim doc clean
 
-#all: chisel sim
 all: sim doc
 
-#sim: chisel
 sim:
-	cd ${THISDIR}/${MODULE} && \\
-	${PYL} __init__.py
-
-#chisel:
-#	cd $THISDIR/chisel && \\
-#	make
+	${PYL} -m NR_signal_generator
 
 doc:
 	cd $THISDIR/doc && \\

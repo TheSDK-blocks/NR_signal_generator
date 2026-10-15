@@ -11,3 +11,6 @@ doc/build/*
 Simulations/
 spice/tb_*
 spice/subckt_*
+build/
+dist/
+*.egg-info/
